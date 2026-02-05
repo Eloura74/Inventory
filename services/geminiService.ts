@@ -1,7 +1,8 @@
 import { GoogleGenAI } from "@google/genai";
 import { InventoryItem, StockMovement } from "../types";
 
-const GEMINI_API_KEY = process.env.API_KEY || ''; // In a real app, handle missing key gracefully
+// Récupération de la clé API Gemini depuis les variables d'environnement
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY || ''; // Correspond à .env.local
 
 // Helper to sanitize data for the prompt (reduce token usage)
 const formatInventoryForPrompt = (inventory: InventoryItem[]) => {

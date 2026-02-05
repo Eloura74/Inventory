@@ -200,8 +200,20 @@ const Dashboard: React.FC = () => {
       (i) => i.status === ItemStatus.LOW,
     ).length;
     const value = totalItems * 150;
-    return { totalItems, lowStock, value };
-  }, [inventory]);
+    
+    // Calcul des items actuellement en prêt (mouvements OUT récents)
+    // On compte le nombre de mouvements OUT uniques par item dans les 30 derniers jours
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    
+    const activeLoans = movements.filter(
+      (m) =>
+        m.type === MovementType.OUT &&
+        new Date(m.createdAt) > thirtyDaysAgo,
+    ).length;
+    
+    return { totalItems, lowStock, value, activeLoans };
+  }, [inventory, movements]);
 
   const categoryData = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -292,9 +304,9 @@ const Dashboard: React.FC = () => {
             Active Loans
           </p>
           <h3 className="text-4xl font-bold text-white font-mono tracking-tighter">
-            12
+            {stats.activeLoans}
           </h3>
-          <p className="text-xs text-zinc-500 mt-3">Items currently out</p>
+          <p className="text-xs text-zinc-500 mt-3">Items out (last 30 days)</p>
         </div>
       </div>
 
@@ -1701,7 +1713,7 @@ const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       try {
         setIsLoading(true);
         console.log("Fetching API data...");
-        const [fetchedItems, fetchedLocs, fetchedMovs] = await Promise.all([
+        const [fetchedItems, fetchedLocs, fetchedMovs, fetchedComments] = await Promise.all([
           api.items.list().catch((e) => {
             console.error("Items fetch failed", e);
             return [];
@@ -1714,12 +1726,17 @@ const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             console.error("Movs fetch failed", e);
             return [];
           }),
+          api.comments.list().catch((e) => {
+            console.error("Comments fetch failed", e);
+            return [];
+          }),
         ]);
 
-        console.log("Data fetched:", { fetchedItems, fetchedLocs });
+        console.log("Data fetched:", { fetchedItems, fetchedLocs, fetchedComments });
         setItems(fetchedItems);
         setLocations(fetchedLocs);
         setMovements(fetchedMovs);
+        setComments(fetchedComments);
       } catch (error) {
         console.error("Critical Fetch Error:", error);
       } finally {
@@ -1730,24 +1747,15 @@ const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     fetchData();
   }, []);
 
-  // Derive Inventory State (Real-time calculation)
+  // Derive Inventory State
+  // L'API met à jour currentStock automatiquement lors des mouvements
+  // On utilise donc directement la valeur de la DB (source de vérité)
   const inventory: InventoryItem[] = useMemo(() => {
-    return items.map((item) => {
-      const stock = movements.reduce((acc, mov) => {
-        if (mov.itemId !== item.id) return acc;
-        if (mov.type === MovementType.IN) return acc + mov.quantity;
-        if (mov.type === MovementType.OUT) return acc - mov.quantity;
-        if (mov.type === MovementType.ADJUST) return mov.quantity;
-        return acc;
-      }, 0); // Start from 0 for calculation based on movements, OR use item.currentStock from DB if we trust it
-
-      // NOTE: Our API updates item.currentStock atomically.
-      // So we can arguably just use item.currentStock + local optimistic updates.
-      // But let's keep this calculation for safety if simple.
-      // Actually, simplistic approach: use item.currentStock from DB (fetched in items).
-      return { ...item, currentStock: item.currentStock || 0 };
-    });
-  }, [items, movements]);
+    return items.map((item) => ({
+      ...item,
+      currentStock: item.currentStock || 0,
+    }));
+  }, [items]);
 
   // --- CRUD Handlers ---
 
@@ -1818,22 +1826,26 @@ const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   );
 
   const addComment = useCallback(
-    (
+    async (
       commentData: Omit<
         Comment,
         "id" | "createdAt" | "createdBy" | "authorName"
       >,
     ) => {
-      const newComment: Comment = {
-        ...commentData,
-        id: `c_${Date.now()}`,
-        createdAt: new Date().toISOString(),
-        createdBy: currentUser.id,
-        authorName: currentUser.name,
-      };
-      setComments((prev) => [...prev, newComment]);
+      try {
+        // Créer le commentaire via l'API
+        const created = await api.comments.create({
+          text: commentData.text,
+          entityType: commentData.entityType,
+          entityId: commentData.entityId,
+        });
+        // Ajouter au state local
+        setComments((prev) => [created, ...prev]);
+      } catch (e) {
+        console.error("Failed to add comment", e);
+      }
     },
-    [currentUser],
+    [],
   );
 
   const getCommentsForEntity = useCallback(

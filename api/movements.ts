@@ -1,9 +1,6 @@
 import { VercelRequest, VercelResponse } from "@vercel/node";
-import { PrismaClient } from "@prisma/client";
 import { z } from "zod";
-
-// Prisma Client Singleton pour Vercel Serverless
-const prisma = new PrismaClient();
+import prisma from "../lib/prisma";
 
 const MovementSchema = z.object({
   type: z.enum(["IN", "OUT", "TRANSFER", "ADJUST"]),
@@ -59,7 +56,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           type,
           fromLocationId,
           toLocationId,
-          createdById_MOCK,
         } = req.body;
 
         // Transaction: Créer le mouvement ET mettre à jour le stock
@@ -104,11 +100,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             if (item) {
               const newStock = (item.currentStock || 0) + stockChange;
 
-              // Mettre à jour ItemStatus
+              // Mettre à jour ItemStatus avec logique correcte (ordre important)
               let newStatus = item.status;
-              if (newStock <= item.minStockThreshold) newStatus = "LOW";
-              if (newStock > item.minStockThreshold) newStatus = "OK";
-              if (newStock <= 0) newStatus = "UNAVAILABLE"; // Ou maintain LOW si < 0 impossible
+              if (newStock <= 0) {
+                newStatus = "UNAVAILABLE";
+              } else if (newStock <= item.minStockThreshold) {
+                newStatus = "LOW";
+              } else {
+                newStatus = "OK";
+              }
 
               await tx.item.update({
                 where: { id: itemId },

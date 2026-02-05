@@ -1,4 +1,4 @@
-import { Item, Location, MovementType, StockMovement } from "../types";
+import { Item, Location, MovementType, StockMovement, Comment } from "../types";
 
 const API_BASE = "/api";
 
@@ -85,6 +85,34 @@ export const api = {
       });
       if (!res.ok) throw new Error("Failed to create movement");
       return res.json();
+    },
+  },
+
+  comments: {
+    list: async (): Promise<Comment[]> => {
+      const res = await fetch(`${API_BASE}/comments`, { headers });
+      if (!res.ok) throw new Error("Failed to fetch comments");
+      return res.json();
+    },
+    create: async (data: {
+      text: string;
+      entityType: "ITEM" | "MOVEMENT" | "LOCATION";
+      entityId: string;
+    }): Promise<Comment> => {
+      const res = await fetch(`${API_BASE}/comments`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error("Failed to create comment");
+      return res.json();
+    },
+    delete: async (id: string): Promise<void> => {
+      const res = await fetch(`${API_BASE}/comments?id=${id}`, {
+        method: "DELETE",
+        headers,
+      });
+      if (!res.ok) throw new Error("Failed to delete comment");
     },
   },
 };

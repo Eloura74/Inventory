@@ -1,9 +1,6 @@
 import { VercelRequest, VercelResponse } from "@vercel/node";
-import { PrismaClient } from "@prisma/client";
 import { z } from "zod";
-
-// Prisma Client Singleton pour Vercel Serverless
-const prisma = new PrismaClient();
+import prisma from "../lib/prisma";
 
 // Schema de validation pour Item
 const ItemSchema = z.object({
