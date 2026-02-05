@@ -1,0 +1,1289 @@
+import React, { useState, useEffect, useMemo, useContext, createContext, useCallback } from 'react';
+import { 
+  LayoutDashboard, 
+  Box, 
+  ArrowRightLeft, 
+  MapPin, 
+  Users, 
+  Search, 
+  Plus, 
+  Filter, 
+  AlertTriangle, 
+  History, 
+  MessageSquare,
+  Bot,
+  LogOut,
+  ChevronRight,
+  TrendingUp,
+  PackageCheck,
+  PackageX,
+  X,
+  Menu,
+  MoreVertical,
+  Trash2,
+  Edit,
+  Building2,
+  UserCircle,
+  Download,
+  Printer,
+  FileSpreadsheet,
+  Activity
+} from 'lucide-react';
+import { 
+  BarChart, 
+  Bar, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  ResponsiveContainer
+} from 'recharts';
+
+import { 
+  Item, 
+  Location, 
+  StockMovement, 
+  User, 
+  InventoryItem, 
+  Comment, 
+  Role, 
+  MovementType, 
+  ItemStatus,
+  LocationType
+} from './types';
+import { MOCK_ITEMS, MOCK_LOCATIONS, MOCK_MOVEMENTS, MOCK_USERS, MOCK_COMMENTS } from './constants';
+import { Button } from './components/Button';
+import { Modal } from './components/Modal';
+import { analyzeInventory } from './services/geminiService';
+
+// --- Context & State Management ---
+
+interface AppState {
+  items: Item[];
+  locations: Location[];
+  movements: StockMovement[];
+  comments: Comment[];
+  currentUser: User;
+}
+
+interface AppContextType extends AppState {
+  // Items CRUD
+  addItem: (item: Omit<Item, 'id'>) => void;
+  updateItem: (id: string, item: Partial<Item>) => void;
+  deleteItem: (id: string) => void;
+  
+  // Locations CRUD
+  addLocation: (loc: Omit<Location, 'id'>) => void;
+  deleteLocation: (id: string) => void;
+
+  // Movements & Comments
+  addMovement: (movement: Omit<StockMovement, 'id' | 'createdAt' | 'createdBy'>) => void;
+  addComment: (comment: Omit<Comment, 'id' | 'createdAt' | 'createdBy' | 'authorName'>) => void;
+  
+  // Derived
+  inventory: InventoryItem[];
+  getCommentsForEntity: (type: string, id: string) => Comment[];
+}
+
+const AppContext = createContext<AppContextType | null>(null);
+
+const useAppContext = () => {
+  const context = useContext(AppContext);
+  if (!context) throw new Error("useAppContext must be used within AppProvider");
+  return context;
+};
+
+// --- Components ---
+
+const SidebarItem = ({ icon: Icon, label, active, onClick }: { icon: any, label: string, active: boolean, onClick: () => void }) => (
+  <button 
+    onClick={onClick}
+    className={`w-full flex items-center space-x-3 px-4 py-2.5 rounded transition-all duration-200 group text-sm border-l-2 ${
+      active 
+        ? 'bg-brand-600/10 text-white border-brand-500' 
+        : 'text-slate-400 hover:bg-white/5 hover:text-slate-200 border-transparent'
+    }`}
+  >
+    <Icon size={18} className={active ? 'text-brand-500' : 'text-slate-500 group-hover:text-slate-300'} />
+    <span className="font-medium tracking-wide">{label}</span>
+  </button>
+);
+
+const StatusBadge = ({ status }: { status: ItemStatus }) => {
+  const styles = {
+    [ItemStatus.OK]: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20',
+    [ItemStatus.LOW]: 'bg-brand-600/10 text-brand-500 border-brand-600/20', // Using Brand Orange for Alerts
+    [ItemStatus.MAINTENANCE]: 'bg-slate-700/50 text-slate-300 border-slate-600',
+    [ItemStatus.UNAVAILABLE]: 'bg-red-500/10 text-red-500 border-red-500/20',
+  };
+
+  return (
+    <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] uppercase tracking-wider font-bold border ${styles[status]}`}>
+      {status}
+    </span>
+  );
+};
+
+const Card: React.FC<{ children: React.ReactNode, className?: string, title?: string, icon?: any, action?: React.ReactNode }> = ({ children, className = '', title, icon: Icon, action }) => (
+  <div className={`bg-[#0b1120] border border-slate-800 rounded shadow-sm flex flex-col ${className} card relative overflow-hidden`}>
+    {/* Subtle top glow line */}
+    <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-slate-700 to-transparent opacity-50"></div>
+    
+    {(title || Icon) && (
+      <div className="px-5 py-3 border-b border-slate-800/80 flex items-center justify-between bg-slate-900/30">
+        <div className="flex items-center gap-2">
+          {Icon && <Icon size={16} className="text-brand-500" />}
+          {title && <h3 className="text-xs font-bold text-slate-300 tracking-widest uppercase">{title}</h3>}
+        </div>
+        {action && <div>{action}</div>}
+      </div>
+    )}
+    <div className="p-5 flex-1">
+      {children}
+    </div>
+  </div>
+);
+
+// --- DASHBOARD ---
+const Dashboard: React.FC = () => {
+  const { inventory, movements } = useAppContext();
+
+  const stats = useMemo(() => {
+    const totalItems = inventory.reduce((acc, i) => acc + i.currentStock, 0);
+    const lowStock = inventory.filter(i => i.status === ItemStatus.LOW).length;
+    const value = totalItems * 150; 
+    return { totalItems, lowStock, value };
+  }, [inventory]);
+
+  const categoryData = useMemo(() => {
+    const counts: Record<string, number> = {};
+    inventory.forEach(i => {
+      counts[i.category] = (counts[i.category] || 0) + i.currentStock;
+    });
+    return Object.entries(counts).map(([name, value]) => ({ name, value }));
+  }, [inventory]);
+
+  const recentMovements = movements.slice(0, 7).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+  return (
+    <div className="space-y-6 animate-in fade-in duration-500">
+      <header className="flex flex-col md:flex-row md:justify-between md:items-end gap-2 no-print">
+        <div>
+           <h1 className="text-2xl font-bold text-white tracking-tight">Dashboard</h1>
+           <p className="text-sm text-slate-500">Logistics command center.</p>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" className="gap-2" onClick={() => window.print()}>
+             <Printer size={14} /> Report
+          </Button>
+        </div>
+      </header>
+
+      {/* KPI Cards - Dense Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="bg-[#0b1120] p-5 rounded border border-slate-800 shadow-sm relative overflow-hidden group hover:border-slate-700 transition-colors">
+          <div className="absolute top-0 right-0 p-3 opacity-5 group-hover:opacity-10 transition-opacity">
+            <PackageCheck size={80} />
+          </div>
+          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Total Assets</p>
+          <h3 className="text-3xl font-bold text-white mt-1 font-mono tracking-tighter">{stats.totalItems}</h3>
+          <p className="text-xs text-emerald-500 mt-2 flex items-center gap-1 font-medium"><TrendingUp size={12}/> +2% this week</p>
+        </div>
+
+        <div className="bg-[#0b1120] p-5 rounded border border-slate-800 shadow-sm relative overflow-hidden group hover:border-brand-900/50 transition-colors">
+          <div className="absolute top-0 right-0 p-3 opacity-5 group-hover:opacity-10 transition-opacity">
+            <AlertTriangle size={80} className="text-brand-500" />
+          </div>
+          <p className="text-[10px] font-bold text-brand-500 uppercase tracking-widest">Attention Needed</p>
+          <h3 className="text-3xl font-bold text-white mt-1 font-mono tracking-tighter">{stats.lowStock}</h3>
+          <p className="text-xs text-brand-600 mt-2 flex items-center gap-1 font-medium">Low stock alerts</p>
+        </div>
+
+        <div className="bg-[#0b1120] p-5 rounded border border-slate-800 shadow-sm relative overflow-hidden group hover:border-slate-700 transition-colors">
+          <div className="absolute top-0 right-0 p-3 opacity-5 group-hover:opacity-10 transition-opacity">
+            <Activity size={80} />
+          </div>
+          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Est. Value</p>
+          <h3 className="text-3xl font-bold text-white mt-1 font-mono tracking-tighter">${(stats.value / 1000).toFixed(1)}k</h3>
+           <p className="text-xs text-slate-500 mt-2">Inventory valuation</p>
+        </div>
+        
+        <div className="bg-[#0b1120] p-5 rounded border border-slate-800 shadow-sm relative overflow-hidden group hover:border-slate-700 transition-colors">
+           <div className="absolute top-0 right-0 p-3 opacity-5 group-hover:opacity-10 transition-opacity">
+            <ArrowRightLeft size={80} />
+          </div>
+          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Active Loans</p>
+          <h3 className="text-3xl font-bold text-white mt-1 font-mono tracking-tighter">12</h3>
+           <p className="text-xs text-slate-500 mt-2">Items currently out</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        {/* Chart */}
+        <Card title="Stock Distribution" icon={Activity} className="xl:col-span-2">
+          <div className="h-72">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={categoryData} barSize={32}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#1e293b" />
+                <XAxis dataKey="name" axisLine={false} tickLine={false} stroke="#64748b" tick={{ fill: '#64748b', fontSize: 11, fontWeight: 500 }} />
+                <YAxis axisLine={false} tickLine={false} stroke="#64748b" tick={{ fill: '#64748b', fontSize: 11 }} />
+                <Tooltip 
+                  cursor={{ fill: '#334155', opacity: 0.1 }}
+                  contentStyle={{ backgroundColor: '#020617', borderColor: '#334155', color: '#f1f5f9', borderRadius: '4px', fontSize: '12px' }}
+                  itemStyle={{ color: '#e2e8f0' }}
+                />
+                <Bar dataKey="value" fill="#ea580c" radius={[2, 2, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </Card>
+
+        {/* Recent Activity */}
+        <Card title="Audit Log" icon={History}>
+          <div className="space-y-0 -mx-3">
+            {recentMovements.map(m => (
+              <div key={m.id} className="flex items-center space-x-3 py-2 px-3 border-b border-slate-800/50 last:border-0 hover:bg-slate-800/30 transition-colors group text-sm">
+                <div className={`p-1 rounded shrink-0 border ${
+                  m.type === MovementType.IN ? 'bg-emerald-950/50 text-emerald-400 border-emerald-900/50' :
+                  m.type === MovementType.OUT ? 'bg-brand-950/50 text-brand-400 border-brand-900/50' :
+                  'bg-slate-800 text-slate-400 border-slate-700'
+                }`}>
+                  {m.type === MovementType.IN ? <Plus size={12} /> : 
+                   m.type === MovementType.OUT ? <PackageX size={12} /> : 
+                   <ArrowRightLeft size={12} />}
+                </div>
+                <div className="min-w-0 flex-1 flex justify-between items-center">
+                   <div>
+                     <p className="font-medium text-slate-300 truncate w-32 md:w-auto">
+                        {m.type === 'IN' ? 'Received' : m.type === 'OUT' ? 'Dispatched' : m.type} <span className="text-white">{m.quantity}</span>
+                     </p>
+                   </div>
+                   <span className="text-[10px] text-slate-600 font-mono whitespace-nowrap">{new Date(m.createdAt).toLocaleDateString(undefined, {month:'numeric', day:'numeric'})}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+          <button className="w-full mt-auto pt-4 text-[10px] uppercase font-bold tracking-wider text-slate-500 hover:text-white text-center transition-colors">
+            View All Log
+          </button>
+        </Card>
+      </div>
+    </div>
+  );
+};
+
+// --- INVENTORY ---
+const Inventory: React.FC = () => {
+  const { inventory, addItem, updateItem, deleteItem, addComment, getCommentsForEntity } = useAppContext();
+  const [search, setSearch] = useState('');
+  const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
+  const [commentText, setCommentText] = useState('');
+  
+  // Modal State
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editMode, setEditMode] = useState(false);
+  const [itemForm, setItemForm] = useState<Partial<Item>>({});
+
+  const filtered = useMemo(() => {
+    return inventory.filter(i => 
+      i.name.toLowerCase().includes(search.toLowerCase()) || 
+      i.category.toLowerCase().includes(search.toLowerCase()) ||
+      i.tags.some(t => t.toLowerCase().includes(search.toLowerCase()))
+    );
+  }, [inventory, search]);
+
+  const handlePostComment = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedItem || !commentText.trim()) return;
+    addComment({
+      entityType: 'ITEM',
+      entityId: selectedItem.id,
+      text: commentText
+    });
+    setCommentText('');
+  };
+
+  const handleAddNew = () => {
+    setEditMode(false);
+    setItemForm({ name: '', brand: '', model: '', category: 'General', minStockThreshold: 1, tags: [], description: '', imageUrl: 'https://picsum.photos/200' });
+    setIsModalOpen(true);
+  };
+
+  const handleEdit = (item: Item) => {
+    setEditMode(true);
+    setItemForm({ ...item });
+    setIsModalOpen(true);
+    setSelectedItem(null); 
+  };
+
+  const handleDelete = (id: string) => {
+    if(window.confirm('Are you sure you want to delete this item?')) {
+      deleteItem(id);
+      setSelectedItem(null);
+    }
+  };
+
+  const handleSaveItem = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!itemForm.name || !itemForm.category) return;
+
+    if (editMode && itemForm.id) {
+      updateItem(itemForm.id, itemForm);
+    } else {
+      addItem(itemForm as Omit<Item, 'id'>);
+    }
+    setIsModalOpen(false);
+  };
+
+  const exportCSV = () => {
+    const headers = ["ID", "Name", "Brand", "Model", "Category", "Current Stock", "Min Threshold", "Status"];
+    const rows = inventory.map(i => [
+      i.id, 
+      `"${i.name}"`, 
+      `"${i.brand}"`, 
+      `"${i.model}"`, 
+      `"${i.category}"`, 
+      i.currentStock, 
+      i.minStockThreshold, 
+      i.status
+    ].join(","));
+    
+    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows].join("\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `inventory_export_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const itemComments = selectedItem ? getCommentsForEntity('ITEM', selectedItem.id) : [];
+
+  return (
+    <div className="h-[calc(100vh-6rem)] md:h-[calc(100vh-2rem)] flex gap-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
+      <div className="flex-1 flex flex-col space-y-4 min-w-0">
+        <header className="flex flex-col xl:flex-row xl:justify-between xl:items-center gap-4 bg-[#0b1120] p-4 rounded border border-slate-800 no-print shadow-sm">
+          <div>
+            <h1 className="text-xl font-bold text-white tracking-tight">Inventory</h1>
+          </div>
+          <div className="flex flex-wrap gap-2 items-center">
+             <div className="relative group flex-1 md:flex-none">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-brand-500 transition-colors" size={16} />
+              <input 
+                type="text" 
+                placeholder="Search items..." 
+                className="w-full md:w-64 pl-9 pr-4 py-1.5 bg-slate-900 border border-slate-700 rounded text-sm text-slate-200 placeholder-slate-600 focus:ring-1 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all shadow-sm"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+            <div className="h-6 w-px bg-slate-800 mx-2 hidden md:block"></div>
+            <Button variant="outline" size="sm" onClick={exportCSV} className="gap-2">
+              <FileSpreadsheet size={14} /> Export CSV
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => window.print()} className="gap-2">
+              <Printer size={14} /> PDF
+            </Button>
+            <Button onClick={handleAddNew} className="flex items-center gap-2" size="sm">
+              <Plus size={16} /> Add Item
+            </Button>
+          </div>
+        </header>
+
+        <div className="flex-1 overflow-hidden bg-[#0b1120] rounded border border-slate-800 shadow-sm flex flex-col">
+          <div className="overflow-auto custom-scrollbar flex-1">
+            <table className="w-full text-left text-sm whitespace-nowrap">
+              <thead className="bg-slate-900 text-slate-400 font-bold uppercase text-[10px] tracking-wider sticky top-0 z-10 border-b border-slate-800">
+                <tr>
+                  <th className="px-4 py-2.5">Item Details</th>
+                  <th className="px-4 py-2.5 hidden sm:table-cell">Category</th>
+                  <th className="px-4 py-2.5 w-32">Stock Level</th>
+                  <th className="px-4 py-2.5 hidden md:table-cell">Status</th>
+                  <th className="px-4 py-2.5 hidden lg:table-cell">Brand</th>
+                  <th className="px-4 py-2.5 text-right no-print">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800/60">
+                {filtered.map(item => (
+                  <tr key={item.id} className="hover:bg-slate-800/30 transition-colors group">
+                    <td className="px-4 py-2.5">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded bg-slate-800 overflow-hidden border border-slate-700 shrink-0">
+                           <img src={item.imageUrl} alt="" className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all" />
+                        </div>
+                        <div>
+                          <div className="font-bold text-slate-200 text-xs">{item.name}</div>
+                          <div className="text-[10px] text-slate-500 font-mono">{item.model}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-2.5 text-slate-400 text-xs hidden sm:table-cell">{item.category}</td>
+                    <td className="px-4 py-2.5">
+                      <div className="w-full max-w-[140px]">
+                        <div className="flex justify-between text-[10px] mb-1">
+                          <span className="text-white font-mono">{item.currentStock}</span>
+                          <span className="text-slate-500">Min: {item.minStockThreshold}</span>
+                        </div>
+                        <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
+                           <div 
+                              className={`h-full rounded-full ${
+                                item.currentStock === 0 ? 'bg-red-500' :
+                                item.currentStock <= item.minStockThreshold ? 'bg-brand-500' : 'bg-slate-500' // Slate for OK, Brand for Low
+                              }`} 
+                              style={{ width: `${Math.min((item.currentStock / (item.minStockThreshold * 3)) * 100, 100)}%` }}
+                            ></div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-2.5 hidden md:table-cell">
+                      <StatusBadge status={item.status} />
+                    </td>
+                    <td className="px-4 py-2.5 text-slate-500 text-xs hidden lg:table-cell">{item.brand}</td>
+                    <td className="px-4 py-2.5 text-right no-print">
+                      <div className="flex justify-end gap-1">
+                        <button onClick={() => handleEdit(item)} className="p-1 hover:bg-slate-700 rounded text-slate-400 hover:text-white transition-colors">
+                          <Edit size={14} />
+                        </button>
+                        <button onClick={() => handleDelete(item.id)} className="p-1 hover:bg-slate-700 rounded text-slate-400 hover:text-red-400 transition-colors">
+                          <Trash2 size={14} />
+                        </button>
+                        <Button size="xs" variant="ghost" onClick={() => setSelectedItem(item)} className="h-6 w-6 p-0 flex items-center justify-center">
+                           <ChevronRight size={14} />
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      {/* Detail Panel */}
+      {selectedItem && (
+        <div className="w-80 bg-[#0b1120] border-l border-slate-800 p-0 shadow-xl flex flex-col h-full overflow-hidden fixed right-0 top-0 bottom-0 z-40 md:static md:z-0 md:rounded md:border md:shadow-lg animate-in slide-in-from-right duration-300 no-print">
+          <div className="p-4 border-b border-slate-800 flex justify-between items-center bg-[#0b1120] sticky top-0">
+            <h3 className="font-bold text-white tracking-tight">Item Details</h3>
+            <button onClick={() => setSelectedItem(null)} className="md:hidden text-slate-400 hover:text-white p-1 hover:bg-slate-800 rounded transition-colors">
+              <X size={18} />
+            </button>
+          </div>
+          
+          <div className="flex-1 overflow-y-auto p-5 space-y-6 custom-scrollbar">
+            <div className="text-center relative">
+              <div className="w-24 h-24 mx-auto rounded overflow-hidden bg-slate-900 border border-slate-700 shadow-sm mb-3">
+                 <img src={selectedItem.imageUrl} alt={selectedItem.name} className="w-full h-full object-cover" />
+              </div>
+              <h4 className="font-bold text-base text-white">{selectedItem.name}</h4>
+              <p className="text-xs text-brand-500 font-medium tracking-wide font-mono uppercase">{selectedItem.brand} • {selectedItem.model}</p>
+              
+              <div className="flex justify-center mt-2">
+                <StatusBadge status={selectedItem.status} />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <div className="bg-slate-900/50 p-2 rounded border border-slate-800 text-center">
+                <span className="text-slate-500 text-[9px] uppercase tracking-wider block mb-1 font-semibold">Stock</span>
+                <span className="text-lg font-bold text-white font-mono">{selectedItem.currentStock}</span>
+              </div>
+              <div className="bg-slate-900/50 p-2 rounded border border-slate-800 text-center">
+                <span className="text-slate-500 text-[9px] uppercase tracking-wider block mb-1 font-semibold">Min</span>
+                <span className="text-lg font-bold text-slate-300 font-mono">{selectedItem.minStockThreshold}</span>
+              </div>
+            </div>
+
+            <div>
+               <h5 className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold mb-2">Tags</h5>
+               <div className="flex flex-wrap gap-1">
+                 {selectedItem.tags.map(t => (
+                   <span key={t} className="px-2 py-0.5 bg-slate-800/50 text-slate-400 rounded text-[10px] border border-slate-700 border-dashed">#{t}</span>
+                 ))}
+               </div>
+            </div>
+
+            <div className="bg-slate-900/30 rounded p-3 border border-slate-800/50">
+              <h5 className="text-xs font-semibold text-slate-300 mb-1">Description</h5>
+              <p className="text-xs text-slate-500 leading-relaxed">{selectedItem.description}</p>
+            </div>
+
+            {/* Comments Section */}
+            <div>
+              <h5 className="font-semibold text-xs mb-3 flex items-center gap-2 text-white border-t border-slate-800 pt-4">
+                <MessageSquare size={14} className="text-brand-500" /> Activity Log
+              </h5>
+              <div className="space-y-2 mb-3">
+                {itemComments.map(c => (
+                  <div key={c.id} className="bg-slate-900 p-2 rounded border border-slate-800">
+                    <div className="flex justify-between mb-1 items-center">
+                      <span className="font-bold text-slate-300 text-[10px]">{c.authorName}</span>
+                      <span className="text-slate-600 text-[9px] font-mono">{new Date(c.createdAt).toLocaleDateString()}</span>
+                    </div>
+                    <p className="text-slate-400 text-xs">{c.text}</p>
+                  </div>
+                ))}
+                {itemComments.length === 0 && <p className="text-xs text-slate-600 italic text-center py-2">No notes recorded.</p>}
+              </div>
+              
+              <form onSubmit={handlePostComment} className="flex gap-2">
+                <input 
+                  className="flex-1 bg-slate-950 border border-slate-700 rounded px-2 py-1.5 text-xs text-slate-200 placeholder-slate-600 focus:ring-1 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all"
+                  placeholder="Add a note..."
+                  value={commentText}
+                  onChange={(e) => setCommentText(e.target.value)}
+                />
+                <Button size="xs" type="submit" className="h-auto">Post</Button>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add/Edit Modal */}
+      <Modal 
+        isOpen={isModalOpen} 
+        onClose={() => setIsModalOpen(false)} 
+        title={editMode ? "Edit Item" : "Create New Item"}
+      >
+        <form onSubmit={handleSaveItem} className="space-y-4">
+          <div>
+            <label className="block text-xs font-medium text-slate-400 mb-1">Item Name</label>
+            <input 
+              required
+              className="w-full bg-[#020617] border border-slate-700 rounded px-3 py-2 text-sm text-slate-200 focus:ring-1 focus:ring-brand-500 outline-none transition-colors"
+              value={itemForm.name || ''}
+              onChange={e => setItemForm({...itemForm, name: e.target.value})}
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-medium text-slate-400 mb-1">Brand</label>
+              <input 
+                className="w-full bg-[#020617] border border-slate-700 rounded px-3 py-2 text-sm text-slate-200 focus:ring-1 focus:ring-brand-500 outline-none transition-colors"
+                value={itemForm.brand || ''}
+                onChange={e => setItemForm({...itemForm, brand: e.target.value})}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-400 mb-1">Model</label>
+              <input 
+                className="w-full bg-[#020617] border border-slate-700 rounded px-3 py-2 text-sm text-slate-200 focus:ring-1 focus:ring-brand-500 outline-none transition-colors"
+                value={itemForm.model || ''}
+                onChange={e => setItemForm({...itemForm, model: e.target.value})}
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-medium text-slate-400 mb-1">Category</label>
+              <input 
+                required
+                className="w-full bg-[#020617] border border-slate-700 rounded px-3 py-2 text-sm text-slate-200 focus:ring-1 focus:ring-brand-500 outline-none transition-colors"
+                value={itemForm.category || ''}
+                onChange={e => setItemForm({...itemForm, category: e.target.value})}
+              />
+            </div>
+             <div>
+              <label className="block text-xs font-medium text-slate-400 mb-1">Min Stock Alert</label>
+              <input 
+                type="number"
+                min="0"
+                className="w-full bg-[#020617] border border-slate-700 rounded px-3 py-2 text-sm text-slate-200 focus:ring-1 focus:ring-brand-500 outline-none transition-colors"
+                value={itemForm.minStockThreshold || 0}
+                onChange={e => setItemForm({...itemForm, minStockThreshold: parseInt(e.target.value)})}
+              />
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-400 mb-1">Image URL</label>
+            <input 
+              className="w-full bg-[#020617] border border-slate-700 rounded px-3 py-2 text-sm text-slate-200 focus:ring-1 focus:ring-brand-500 outline-none text-xs font-mono transition-colors"
+              value={itemForm.imageUrl || ''}
+              onChange={e => setItemForm({...itemForm, imageUrl: e.target.value})}
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-400 mb-1">Description</label>
+            <textarea 
+              className="w-full bg-[#020617] border border-slate-700 rounded px-3 py-2 text-sm text-slate-200 focus:ring-1 focus:ring-brand-500 outline-none h-20 transition-colors"
+              value={itemForm.description || ''}
+              onChange={e => setItemForm({...itemForm, description: e.target.value})}
+            />
+          </div>
+          <div className="flex justify-end gap-3 pt-2">
+            <Button type="button" variant="ghost" onClick={() => setIsModalOpen(false)}>Cancel</Button>
+            <Button type="submit">{editMode ? 'Save Changes' : 'Create Item'}</Button>
+          </div>
+        </form>
+      </Modal>
+    </div>
+  );
+};
+
+// --- LOCATIONS & CLIENTS MANAGEMENT ---
+const LocationsManagement: React.FC = () => {
+  const { locations, addLocation, deleteLocation } = useAppContext();
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [newLoc, setNewLoc] = useState<{name: string, type: LocationType, parentId: string, address: string}>({
+    name: '', type: 'WAREHOUSE', parentId: '', address: ''
+  });
+
+  const internalLocations = locations.filter(l => ['WAREHOUSE', 'ZONE', 'RACK'].includes(l.type));
+  const externalLocations = locations.filter(l => ['CLIENT', 'EVENT', 'ROOM'].includes(l.type));
+
+  const handleAdd = (e: React.FormEvent) => {
+    e.preventDefault();
+    addLocation({
+      name: newLoc.name,
+      type: newLoc.type,
+      parentId: newLoc.parentId || undefined,
+      address: newLoc.address || undefined
+    });
+    setIsModalOpen(false);
+    setNewLoc({ name: '', type: 'WAREHOUSE', parentId: '', address: '' });
+  };
+
+  const LocationCard: React.FC<{ loc: Location }> = ({ loc }) => (
+    <div className="bg-[#0b1120] border border-slate-800 rounded p-4 flex justify-between items-center group hover:border-slate-700 transition-colors shadow-sm">
+      <div className="flex items-center gap-3">
+        <div className={`p-2 rounded ${
+          loc.type === 'WAREHOUSE' ? 'bg-brand-500/10 text-brand-500' :
+          loc.type === 'CLIENT' ? 'bg-emerald-500/10 text-emerald-500' :
+          'bg-slate-800/50 text-slate-400'
+        }`}>
+          {loc.type === 'WAREHOUSE' && <Building2 size={18} />}
+          {loc.type === 'CLIENT' && <UserCircle size={18} />}
+          {(loc.type === 'ZONE' || loc.type === 'RACK') && <Box size={18} />}
+          {loc.type === 'ROOM' && <MapPin size={18} />}
+          {loc.type === 'EVENT' && <Users size={18} />}
+        </div>
+        <div>
+          <h4 className="font-semibold text-sm text-slate-200">{loc.name}</h4>
+          <p className="text-[10px] text-slate-500 uppercase tracking-wider font-mono">{loc.type}</p>
+        </div>
+      </div>
+      <button 
+        onClick={() => deleteLocation(loc.id)}
+        className="opacity-0 group-hover:opacity-100 p-2 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded transition-all"
+      >
+        <Trash2 size={16} />
+      </button>
+    </div>
+  );
+
+  return (
+    <div className="space-y-6 animate-in fade-in duration-500">
+      <header className="flex justify-between items-end">
+        <div>
+          <h1 className="text-2xl font-bold text-white tracking-tight">Locations & Clients</h1>
+          <p className="text-sm text-slate-500">Manage internal storage and external lending destinations.</p>
+        </div>
+        <Button onClick={() => setIsModalOpen(true)} className="flex items-center gap-2" size="sm">
+          <Plus size={16} /> Add Location
+        </Button>
+      </header>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        {/* Internal Storage */}
+        <section>
+          <div className="flex items-center gap-2 mb-4 pb-2 border-b border-slate-800">
+             <Building2 className="text-brand-500" size={18} />
+             <h2 className="text-sm font-semibold text-white uppercase tracking-wider">Internal Storage</h2>
+          </div>
+          <div className="grid gap-3">
+             {internalLocations.map(l => <LocationCard key={l.id} loc={l} />)}
+             {internalLocations.length === 0 && <p className="text-slate-500 italic text-sm">No storage locations defined.</p>}
+          </div>
+        </section>
+
+        {/* External / Clients */}
+        <section>
+          <div className="flex items-center gap-2 mb-4 pb-2 border-b border-slate-800">
+             <Users className="text-emerald-500" size={18} />
+             <h2 className="text-sm font-semibold text-white uppercase tracking-wider">Clients & Venues</h2>
+          </div>
+           <div className="grid gap-3">
+             {externalLocations.map(l => <LocationCard key={l.id} loc={l} />)}
+             {externalLocations.length === 0 && <p className="text-slate-500 italic text-sm">No external clients or rooms defined.</p>}
+          </div>
+        </section>
+      </div>
+
+      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Add Location / Client">
+        <form onSubmit={handleAdd} className="space-y-4">
+          <div>
+            <label className="block text-xs font-medium text-slate-400 mb-1">Name</label>
+            <input 
+              required
+              className="w-full bg-[#020617] border border-slate-700 rounded px-3 py-2 text-sm text-slate-200 focus:ring-1 focus:ring-brand-500 outline-none"
+              placeholder="e.g. Main Warehouse or John Doe"
+              value={newLoc.name}
+              onChange={e => setNewLoc({...newLoc, name: e.target.value})}
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-400 mb-1">Type</label>
+            <select 
+              className="w-full bg-[#020617] border border-slate-700 rounded px-3 py-2 text-sm text-slate-200 focus:ring-1 focus:ring-brand-500 outline-none"
+              value={newLoc.type}
+              onChange={e => setNewLoc({...newLoc, type: e.target.value as LocationType})}
+            >
+              <option value="WAREHOUSE">Warehouse (Storage)</option>
+              <option value="ZONE">Zone (Storage)</option>
+              <option value="RACK">Rack (Storage)</option>
+              <option value="CLIENT">Client (External)</option>
+              <option value="ROOM">Room (Internal/External)</option>
+              <option value="EVENT">Event (Temporary)</option>
+            </select>
+          </div>
+          
+          {['WAREHOUSE', 'ZONE', 'RACK'].includes(newLoc.type) && (
+            <div>
+              <label className="block text-xs font-medium text-slate-400 mb-1">Parent Location (Optional)</label>
+              <select 
+                className="w-full bg-[#020617] border border-slate-700 rounded px-3 py-2 text-sm text-slate-200 focus:ring-1 focus:ring-brand-500 outline-none"
+                value={newLoc.parentId}
+                onChange={e => setNewLoc({...newLoc, parentId: e.target.value})}
+              >
+                <option value="">None (Top Level)</option>
+                {locations.filter(l => l.id !== newLoc.parentId).map(l => (
+                  <option key={l.id} value={l.id}>{l.name} ({l.type})</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {['CLIENT', 'EVENT', 'ROOM'].includes(newLoc.type) && (
+             <div>
+              <label className="block text-xs font-medium text-slate-400 mb-1">Address / Details</label>
+              <input 
+                className="w-full bg-[#020617] border border-slate-700 rounded px-3 py-2 text-sm text-slate-200 focus:ring-1 focus:ring-brand-500 outline-none"
+                placeholder="e.g. 123 Studio Blvd"
+                value={newLoc.address}
+                onChange={e => setNewLoc({...newLoc, address: e.target.value})}
+              />
+            </div>
+          )}
+
+          <div className="flex justify-end gap-3 pt-2">
+            <Button type="button" variant="ghost" onClick={() => setIsModalOpen(false)}>Cancel</Button>
+            <Button type="submit">Create</Button>
+          </div>
+        </form>
+      </Modal>
+    </div>
+  );
+};
+
+// --- MOVEMENTS ---
+const Movements: React.FC = () => {
+  const { items, locations, addMovement } = useAppContext();
+  const [formData, setFormData] = useState({
+    itemId: '',
+    type: MovementType.OUT,
+    quantity: 1,
+    fromLocationId: '',
+    toLocationId: '',
+    note: ''
+  });
+  const [success, setSuccess] = useState(false);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.itemId) return;
+
+    if (formData.type === MovementType.TRANSFER && (!formData.fromLocationId || !formData.toLocationId)) return;
+    if (formData.type === MovementType.OUT && !formData.fromLocationId) return;
+    if (formData.type === MovementType.IN && !formData.toLocationId) return;
+
+    addMovement({
+      itemId: formData.itemId,
+      type: formData.type,
+      quantity: Number(formData.quantity),
+      fromLocationId: formData.fromLocationId || undefined,
+      toLocationId: formData.toLocationId || undefined,
+      note: formData.note
+    });
+
+    setSuccess(true);
+    setTimeout(() => setSuccess(false), 3000);
+    setFormData(prev => ({ ...prev, quantity: 1, note: '' })); 
+  };
+
+  const selectedItem = items.find(i => i.id === formData.itemId);
+
+  const groupedLocations = locations.reduce((acc, loc) => {
+    const group = ['CLIENT', 'EVENT', 'ROOM'].includes(loc.type) ? 'External / Clients' : 'Internal Storage';
+    if (!acc[group]) acc[group] = [];
+    acc[group].push(loc);
+    return acc;
+  }, {} as Record<string, Location[]>);
+
+  const renderLocationOptions = () => (
+    <>
+      <option value="">Select location...</option>
+      {Object.entries(groupedLocations).map(([group, locs]: [string, Location[]]) => (
+        <optgroup key={group} label={group} className="bg-slate-800 text-slate-300">
+          {locs.map(l => <option key={l.id} value={l.id}>{l.name} ({l.type})</option>)}
+        </optgroup>
+      ))}
+    </>
+  );
+
+  return (
+    <div className="max-w-4xl mx-auto space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <header>
+        <h1 className="text-2xl font-bold text-white tracking-tight">Record Movement</h1>
+        <p className="text-sm text-slate-400">Check in, check out, or transfer equipment.</p>
+      </header>
+
+      {success && (
+        <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-4 py-3 rounded flex items-center gap-3 animate-in fade-in duration-300">
+          <PackageCheck size={20} /> <span className="font-medium text-sm">Movement recorded successfully!</span>
+        </div>
+      )}
+
+      <form onSubmit={handleSubmit} className="bg-[#0b1120] p-6 md:p-8 rounded border border-slate-800 shadow-sm space-y-6">
+        
+        {/* Type Selection */}
+        <div>
+           <label className="block text-xs font-medium text-slate-400 mb-3 uppercase tracking-wider">Movement Type</label>
+           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {Object.values(MovementType).map(t => (
+              <button
+                key={t}
+                type="button"
+                onClick={() => setFormData({ ...formData, type: t })}
+                className={`py-3 text-xs font-bold uppercase tracking-wide rounded border transition-all duration-200 ${
+                  formData.type === t 
+                    ? 'bg-brand-600 border-brand-500 text-white shadow-md' 
+                    : 'bg-[#020617] border-slate-800 text-slate-400 hover:border-slate-600 hover:text-slate-200'
+                }`}
+              >
+                {t}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* Item Selection */}
+          <div className="md:col-span-2">
+            <label className="block text-xs font-medium text-slate-400 mb-1.5">Item</label>
+            <div className="relative">
+              <select 
+                className="w-full bg-[#020617] border border-slate-700 rounded px-4 py-3 text-slate-200 outline-none focus:ring-1 focus:ring-brand-500 focus:border-brand-500 transition-all appearance-none text-sm"
+                value={formData.itemId}
+                onChange={(e) => setFormData({...formData, itemId: e.target.value})}
+                required
+              >
+                <option value="">Select an item...</option>
+                {items.map(i => (
+                  <option key={i.id} value={i.id}>{i.name} ({i.model})</option>
+                ))}
+              </select>
+              <div className="absolute right-4 top-3.5 pointer-events-none text-slate-500">
+                <ChevronRight size={16} className="rotate-90" />
+              </div>
+            </div>
+            {selectedItem && (
+              <div className="mt-3 flex items-center gap-3 p-3 bg-slate-950/50 rounded border border-slate-800">
+                  <img src={selectedItem.imageUrl} className="w-10 h-10 rounded object-cover border border-slate-700" alt="" />
+                  <div>
+                    <div className="text-sm font-medium text-slate-200">{selectedItem.name}</div>
+                    <div className="text-[10px] text-slate-500">{selectedItem.category} • Stock: <span className="text-slate-300 font-mono">{selectedItem.minStockThreshold}</span> (Min)</div>
+                  </div>
+              </div>
+            )}
+          </div>
+
+          {/* Quantity */}
+          <div>
+            <label className="block text-xs font-medium text-slate-400 mb-1.5">Quantity</label>
+            <input 
+              type="number" 
+              min="1"
+              className="w-full bg-[#020617] border border-slate-700 rounded px-4 py-3 text-slate-200 outline-none focus:ring-1 focus:ring-brand-500 focus:border-brand-500 transition-all text-sm"
+              value={formData.quantity}
+              onChange={(e) => setFormData({...formData, quantity: parseInt(e.target.value)})}
+            />
+          </div>
+        </div>
+
+        {/* Locations */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {(formData.type === MovementType.OUT || formData.type === MovementType.TRANSFER) && (
+             <div>
+               <label className="block text-xs font-medium text-slate-400 mb-1.5">From Location</label>
+               <div className="relative">
+                 <select 
+                    className="w-full bg-[#020617] border border-slate-700 rounded px-4 py-3 text-slate-200 outline-none focus:ring-1 focus:ring-brand-500 focus:border-brand-500 transition-all appearance-none text-sm"
+                    value={formData.fromLocationId}
+                    onChange={(e) => setFormData({...formData, fromLocationId: e.target.value})}
+                    required
+                  >
+                    {renderLocationOptions()}
+                  </select>
+                  <div className="absolute right-4 top-3.5 pointer-events-none text-slate-500">
+                    <ChevronRight size={16} className="rotate-90" />
+                  </div>
+               </div>
+             </div>
+          )}
+          
+          {(formData.type === MovementType.IN || formData.type === MovementType.TRANSFER) && (
+             <div>
+               <label className="block text-xs font-medium text-slate-400 mb-1.5">To Location</label>
+               <div className="relative">
+                <select 
+                    className="w-full bg-[#020617] border border-slate-700 rounded px-4 py-3 text-slate-200 outline-none focus:ring-1 focus:ring-brand-500 focus:border-brand-500 transition-all appearance-none text-sm"
+                    value={formData.toLocationId}
+                    onChange={(e) => setFormData({...formData, toLocationId: e.target.value})}
+                    required
+                  >
+                    {renderLocationOptions()}
+                  </select>
+                  <div className="absolute right-4 top-3.5 pointer-events-none text-slate-500">
+                    <ChevronRight size={16} className="rotate-90" />
+                  </div>
+               </div>
+             </div>
+          )}
+        </div>
+
+        {/* Note */}
+        <div>
+          <label className="block text-xs font-medium text-slate-400 mb-1.5">Comment / Reference</label>
+          <textarea 
+            className="w-full bg-[#020617] border border-slate-700 rounded px-4 py-3 text-slate-200 outline-none focus:ring-1 focus:ring-brand-500 focus:border-brand-500 transition-all h-20 resize-none text-sm"
+            placeholder="E.g., Order #1234 or Event TechConf"
+            value={formData.note}
+            onChange={(e) => setFormData({...formData, note: e.target.value})}
+          />
+        </div>
+
+        <div className="pt-2">
+          <Button type="submit" className="w-full py-3" size="lg">Confirm Movement</Button>
+        </div>
+      </form>
+    </div>
+  );
+};
+
+// --- GEMINI AI ASSISTANT ---
+const AIAssistant: React.FC = () => {
+  const { inventory, movements } = useAppContext();
+  const [query, setQuery] = useState('');
+  const [response, setResponse] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleAsk = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!query.trim()) return;
+
+    setLoading(true);
+    setResponse('');
+    
+    // Simulate API delay slightly if needed, but analyzeInventory calls actual Gemini
+    const result = await analyzeInventory(query, inventory, movements);
+    
+    setResponse(result);
+    setLoading(false);
+  };
+
+  return (
+    <div className="max-w-3xl mx-auto space-y-6 animate-in fade-in duration-500">
+       <header>
+        <h1 className="text-2xl font-bold text-white flex items-center gap-3">
+          <div className="p-2 bg-brand-500/10 rounded border border-brand-500/20">
+             <Bot className="text-brand-500" /> 
+          </div>
+          AI Inventory Analyst
+        </h1>
+        <p className="text-slate-400">Ask questions about your stock levels, trends, or specific items.</p>
+      </header>
+
+      <div className="bg-[#0b1120] p-6 rounded border border-slate-800 shadow-sm">
+        <form onSubmit={handleAsk} className="relative mb-6">
+          <input 
+            type="text" 
+            placeholder="E.g., 'Which items are running low?' or 'Summarize recent camera movements'"
+            className="w-full bg-[#020617] border border-slate-700 rounded pl-5 pr-14 py-4 text-slate-200 placeholder-slate-500 focus:ring-1 focus:ring-brand-500 focus:border-brand-500 outline-none shadow-inner transition-all"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+          <button 
+            type="submit"
+            disabled={loading}
+            className="absolute right-2 top-2 p-2 bg-brand-600 text-white rounded hover:bg-brand-500 disabled:opacity-50 transition-colors shadow-sm"
+          >
+            {loading ? <div className="animate-spin h-5 w-5 border-2 border-white/30 border-t-white rounded-full" /> : <ChevronRight size={20} />}
+          </button>
+        </form>
+
+        {(response || loading) && (
+          <div className="bg-[#020617] rounded p-6 min-h-[100px] border border-slate-800 animate-in fade-in slide-in-from-top-2 duration-300">
+            {loading ? (
+               <div className="flex items-center gap-3 text-brand-400 animate-pulse">
+                 <Bot size={20} /> 
+                 <span className="font-medium">Analyzing inventory data...</span>
+               </div>
+            ) : (
+              <div className="prose prose-invert prose-sm max-w-none text-slate-300 leading-relaxed">
+                <div className="whitespace-pre-wrap">{response}</div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {['Show me low stock items', 'Suggest a restocking plan', 'Last movement for Sony Alpha?', 'Total inventory value'].map(q => (
+          <button 
+            key={q}
+            onClick={() => setQuery(q)} 
+            className="p-4 bg-[#0b1120] border border-slate-800 rounded text-sm text-slate-400 hover:border-brand-500/50 hover:text-brand-400 hover:bg-[#151f32] text-left transition-all"
+          >
+            {q}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// --- APP SHELL & LOGIC ---
+
+enum Screen {
+  DASHBOARD = 'DASHBOARD',
+  INVENTORY = 'INVENTORY',
+  MOVEMENTS = 'MOVEMENTS',
+  LOCATIONS = 'LOCATIONS',
+  AI = 'AI'
+}
+
+const AppContent: React.FC = () => {
+  const [currentScreen, setCurrentScreen] = useState<Screen>(Screen.DASHBOARD);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { currentUser } = useAppContext();
+
+  const renderScreen = () => {
+    switch (currentScreen) {
+      case Screen.DASHBOARD: return <Dashboard />;
+      case Screen.INVENTORY: return <Inventory />;
+      case Screen.MOVEMENTS: return <Movements />;
+      case Screen.LOCATIONS: return <LocationsManagement />;
+      case Screen.AI: return <AIAssistant />;
+      default: return <Dashboard />;
+    }
+  };
+
+  const handleNav = (screen: Screen) => {
+    setCurrentScreen(screen);
+    setSidebarOpen(false);
+  }
+
+  return (
+    <div className="flex min-h-screen font-sans text-slate-300 selection:bg-brand-500/30 selection:text-brand-200">
+      {/* Sidebar - Desktop with ambient texture */}
+      <aside className={`w-64 sidebar-bg border-r border-slate-800 fixed h-full z-20 transition-transform duration-300 ease-in-out transform ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 flex flex-col no-print shadow-2xl`}>
+        <div className="relative z-10 p-5 border-b border-white/10 backdrop-blur-sm">
+          <div className="flex items-center gap-3 font-bold text-lg text-white tracking-wide">
+            <div className="bg-brand-600 p-1.5 rounded shadow-lg shadow-brand-500/30">
+              <Box size={20} className="text-white" /> 
+            </div>
+            StockFlow
+          </div>
+        </div>
+        
+        <nav className="relative z-10 flex-1 p-3 space-y-1 overflow-y-auto custom-scrollbar backdrop-blur-[2px]">
+          <div className="mb-4">
+            <p className="px-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Main</p>
+            <SidebarItem 
+              icon={LayoutDashboard} 
+              label="Dashboard" 
+              active={currentScreen === Screen.DASHBOARD} 
+              onClick={() => handleNav(Screen.DASHBOARD)} 
+            />
+            <SidebarItem 
+              icon={Box} 
+              label="Inventory" 
+              active={currentScreen === Screen.INVENTORY} 
+              onClick={() => handleNav(Screen.INVENTORY)} 
+            />
+            <SidebarItem 
+              icon={ArrowRightLeft} 
+              label="Movements" 
+              active={currentScreen === Screen.MOVEMENTS} 
+              onClick={() => handleNav(Screen.MOVEMENTS)} 
+            />
+          </div>
+          
+          <div className="mb-4">
+             <p className="px-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Management</p>
+             <SidebarItem 
+              icon={MapPin} 
+              label="Locations & Clients" 
+              active={currentScreen === Screen.LOCATIONS} 
+              onClick={() => handleNav(Screen.LOCATIONS)} 
+            />
+          </div>
+
+          <div>
+            <p className="px-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Intelligence</p>
+            <SidebarItem 
+              icon={Bot} 
+              label="AI Analyst" 
+              active={currentScreen === Screen.AI} 
+              onClick={() => handleNav(Screen.AI)} 
+            />
+          </div>
+        </nav>
+
+        <div className="relative z-10 p-4 border-t border-white/5 bg-black/40 backdrop-blur-md">
+          <div className="flex items-center gap-3 px-2 py-2 rounded hover:bg-white/10 transition-colors cursor-pointer group">
+            <img src={currentUser.avatar} alt="User" className="w-8 h-8 rounded bg-slate-700 border border-slate-600" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-slate-200 truncate group-hover:text-white transition-colors">{currentUser.name}</p>
+              <p className="text-[10px] text-slate-500 truncate uppercase tracking-wider">{currentUser.role}</p>
+            </div>
+            <LogOut size={16} className="text-slate-500 hover:text-white" />
+          </div>
+        </div>
+      </aside>
+      
+      {/* Overlay for mobile sidebar */}
+      {sidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black/80 backdrop-blur-sm z-10 md:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
+      {/* Main Content */}
+      <main className="flex-1 md:ml-64 p-4 md:p-8 overflow-x-hidden relative max-w-[1920px]">
+        {/* Mobile Header */}
+        <div className="md:hidden flex justify-between items-center mb-6 bg-[#0b1120] border border-slate-800 p-4 rounded sticky top-4 z-10 shadow-lg no-print">
+          <div className="font-bold text-lg text-white flex items-center gap-2">
+            <Box size={20} className="text-brand-500" /> StockFlow
+          </div>
+          <button onClick={() => setSidebarOpen(true)} className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded">
+            <Menu size={24} />
+          </button>
+        </div>
+
+        {renderScreen()}
+      </main>
+    </div>
+  );
+};
+
+const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [items, setItems] = useState<Item[]>(MOCK_ITEMS);
+  const [locations, setLocations] = useState<Location[]>(MOCK_LOCATIONS);
+  const [movements, setMovements] = useState<StockMovement[]>(MOCK_MOVEMENTS);
+  const [comments, setComments] = useState<Comment[]>(MOCK_COMMENTS);
+  const [currentUser] = useState<User>(MOCK_USERS[0]);
+
+  // Derive Inventory State (Real-time calculation)
+  const inventory: InventoryItem[] = useMemo(() => {
+    return items.map(item => {
+      // Calculate Stock
+      const stock = movements.reduce((acc, mov) => {
+        if (mov.itemId !== item.id) return acc;
+        switch (mov.type) {
+          case MovementType.IN: return acc + mov.quantity;
+          case MovementType.OUT: return acc - mov.quantity;
+          case MovementType.ADJUST: return mov.quantity; // Treated as relative change
+          default: return acc;
+        }
+      }, 0);
+
+      let status = ItemStatus.OK;
+      if (stock === 0) status = ItemStatus.UNAVAILABLE;
+      else if (stock <= item.minStockThreshold) status = ItemStatus.LOW;
+
+      return { ...item, currentStock: stock, status };
+    });
+  }, [items, movements]);
+
+  // --- CRUD Handlers ---
+  
+  const addItem = useCallback((itemData: Omit<Item, 'id'>) => {
+    const newItem: Item = { ...itemData, id: `it_${Date.now()}` };
+    setItems(prev => [...prev, newItem]);
+  }, []);
+
+  const updateItem = useCallback((id: string, updates: Partial<Item>) => {
+    setItems(prev => prev.map(item => item.id === id ? { ...item, ...updates } : item));
+  }, []);
+
+  const deleteItem = useCallback((id: string) => {
+    setItems(prev => prev.filter(item => item.id !== id));
+  }, []);
+
+  const addLocation = useCallback((locData: Omit<Location, 'id'>) => {
+    const newLoc: Location = { ...locData, id: `loc_${Date.now()}` };
+    setLocations(prev => [...prev, newLoc]);
+  }, []);
+
+  const deleteLocation = useCallback((id: string) => {
+    setLocations(prev => prev.filter(l => l.id !== id));
+  }, []);
+
+  const addMovement = useCallback((movementData: Omit<StockMovement, 'id' | 'createdAt' | 'createdBy'>) => {
+    const newMovement: StockMovement = {
+      ...movementData,
+      id: `mv_${Date.now()}`,
+      createdAt: new Date().toISOString(),
+      createdBy: currentUser.id
+    };
+    setMovements(prev => [...prev, newMovement]);
+  }, [currentUser]);
+
+  const addComment = useCallback((commentData: Omit<Comment, 'id' | 'createdAt' | 'createdBy' | 'authorName'>) => {
+    const newComment: Comment = {
+      ...commentData,
+      id: `c_${Date.now()}`,
+      createdAt: new Date().toISOString(),
+      createdBy: currentUser.id,
+      authorName: currentUser.name
+    };
+    setComments(prev => [...prev, newComment]);
+  }, [currentUser]);
+
+  const getCommentsForEntity = useCallback((type: string, id: string) => {
+    return comments.filter(c => c.entityType === type && c.entityId === id).sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }, [comments]);
+
+  return (
+    <AppContext.Provider value={{ 
+      items, 
+      locations, 
+      movements, 
+      comments, 
+      currentUser, 
+      inventory,
+      addItem,
+      updateItem,
+      deleteItem,
+      addLocation,
+      deleteLocation,
+      addMovement, 
+      addComment,
+      getCommentsForEntity
+    }}>
+      {children}
+    </AppContext.Provider>
+  );
+};
+
+export default function App() {
+  return (
+    <AppProvider>
+      <AppContent />
+    </AppProvider>
+  );
+}

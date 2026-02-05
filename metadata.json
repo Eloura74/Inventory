@@ -1,0 +1,5 @@
+{
+  "name": "StockFlow Pro",
+  "description": "A comprehensive MVP for material inventory management featuring real-time stock calculation, movement tracking, and AI-powered insights.",
+  "requestFramePermissions": []
+}

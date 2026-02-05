@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>StockFlow Pro</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      body {
+        font-family: "Inter", sans-serif;
+      }
+
+      /* Scrollbar moderne et élégant avec cyan */
+      ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+      }
+      ::-webkit-scrollbar-track {
+        background: #0a0d14;
+        border-radius: 4px;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: linear-gradient(180deg, #0891b2 0%, #155e75 100%);
+        border-radius: 4px;
+        border: 2px solid #0a0d14;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: linear-gradient(180deg, #22d3ee 0%, #0891b2 100%);
+        box-shadow: 0 0 8px rgba(6, 182, 212, 0.4);
+      }
+
+      /* Sidebar Premium avec gradient bleu profond et glows */
+      .sidebar-bg {
+        background: linear-gradient(
+          180deg,
+          #0a0d14 0%,
+          #0f1419 50%,
+          #05070a 100%
+        );
+        position: relative;
+      }
+
+      .sidebar-bg::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-image:
+          radial-gradient(
+            circle at 20% 30%,
+            rgba(6, 182, 212, 0.08) 0%,
+            transparent 50%
+          ),
+          radial-gradient(
+            circle at 80% 70%,
+            rgba(245, 158, 11, 0.05) 0%,
+            transparent 50%
+          );
+        pointer-events: none;
+      }
+
+      /* Main area subtle noise/gradient */
+      .main-bg {
+        background-color: #020617;
+        background-image: radial-gradient(
+          circle at top right,
+          rgba(234, 88, 12, 0.03),
+          transparent 40%
+        );
+      }
+
+      /* Print Styles for PDF Export */
+      @media print {
+        body {
+          background: white;
+          color: black;
+        }
+        .no-print {
+          display: none !important;
+        }
+        .print-only {
+          display: block !important;
+        }
+        main {
+          margin: 0 !important;
+          padding: 0 !important;
+        }
+        .card {
+          border: 1px solid #ccc;
+          box-shadow: none;
+          break-inside: avoid;
+        }
+        table {
+          width: 100%;
+          border-collapse: collapse;
+          font-size: 10pt;
+        }
+        th,
+        td {
+          border: 1px solid #ddd;
+          padding: 4px;
+          color: black !important;
+        }
+        th {
+          background-color: #f3f4f6 !important;
+          font-weight: bold;
+        }
+      }
+    </style>
+    <script>
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              // Palette Dark Premium - Bleu Profond
+              slate: {
+                850: "#0f1419",
+                900: "#0a0d14",
+                950: "#05070a",
+              },
+              // Couleurs Brand Premium : Bleu → Cyan avec accents dorés
+              brand: {
+                50: "#f0fdff", // Très clair pour highlights
+                100: "#ccfbff", // Clair
+                200: "#99f6ff", // Cyan pastel
+                300: "#5ee4ff", // Cyan vif
+                400: "#22d3ee", // Cyan brillant (Tailwind cyan-400)
+                500: "#06b6d4", // Cyan principal (Tailwind cyan-500)
+                600: "#0891b2", // Cyan foncé (Primary Action)
+                700: "#0e7490", // Cyan profond
+                800: "#155e75", // Très foncé
+                900: "#164e63", // Presque noir
+                glow: "rgba(6, 182, 212, 0.25)", // Glow cyan
+              },
+              // Accents dorés/ambre pour les warnings et highlights
+              accent: {
+                400: "#fbbf24", // Amber-400 (doré vif)
+                500: "#f59e0b", // Amber-500
+                600: "#d97706", // Amber-600 (or profond)
+                glow: "rgba(245, 158, 11, 0.2)",
+              },
+              // Success : Émeraude élégant
+              success: {
+                400: "#34d399",
+                500: "#10b981",
+                600: "#059669",
+              },
+            },
+            borderRadius: {
+              sm: "0.25rem",
+              DEFAULT: "0.375rem" /* 6px - plus moderne */,
+              md: "0.5rem",
+              lg: "0.75rem",
+              xl: "1rem",
+            },
+            boxShadow: {
+              premium:
+                "0 4px 24px -2px rgba(6, 182, 212, 0.1), 0 2px 8px -1px rgba(0, 0, 0, 0.2)",
+              "premium-lg":
+                "0 8px 32px -4px rgba(6, 182, 212, 0.15), 0 4px 16px -2px rgba(0, 0, 0, 0.3)",
+              glow: "0 0 20px rgba(6, 182, 212, 0.4)",
+              "glow-accent": "0 0 20px rgba(245, 158, 11, 0.3)",
+            },
+          },
+        },
+      };
+    </script>
+    <script type="importmap">
+      {
+        "imports": {
+          "@google/genai": "https://esm.sh/@google/genai@^1.40.0",
+          "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
+          "lucide-react": "https://esm.sh/lucide-react@^0.563.0",
+          "recharts": "https://esm.sh/recharts@^3.7.0",
+          "react/": "https://esm.sh/react@^19.2.4/",
+          "react": "https://esm.sh/react@^19.2.4"
+        }
+      }
+    </script>
+    <link rel="stylesheet" href="/index.css" />
+  </head>
+  <body
+    class="main-bg text-slate-300 antialiased selection:bg-brand-500/30 selection:text-brand-500"
+  >
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>
