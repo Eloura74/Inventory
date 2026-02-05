@@ -176,7 +176,7 @@ const Card: React.FC<{
     {(title || Icon) && (
       <div className="px-6 py-4 border-b border-white/5 flex items-center justify-between bg-black/20 relative z-10">
         <div className="flex items-center gap-3">
-          {Icon && <Icon size={16} className="text-brand-500" />}
+          {Icon && <Icon size={16} className="text-zinc-500" />}
           {title && (
             <h3 className="text-xs font-bold text-zinc-400 tracking-[0.2em] uppercase">
               {title}
@@ -382,7 +382,7 @@ const Dashboard: React.FC = () => {
                     m.type === MovementType.IN
                       ? "bg-emerald-950/50 text-emerald-400 border-emerald-900/50"
                       : m.type === MovementType.OUT
-                        ? "bg-brand-950/50 text-brand-400 border-brand-900/50"
+                        ? "bg-orange-950/50 text-orange-400 border-orange-900/50"
                         : "bg-slate-800 text-slate-400 border-slate-700"
                   }`}
                 >
@@ -549,24 +549,25 @@ const Inventory: React.FC = () => {
     : [];
 
   return (
-    <div className="h-[calc(100vh-6rem)] md:h-[calc(100vh-2rem)] flex gap-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
+    <div className="space-y-6 animate-in fade-in duration-500">
       <div className="flex-1 flex flex-col space-y-4 min-w-0">
-        <header className="flex flex-col xl:flex-row xl:justify-between xl:items-center gap-4 bg-[#0b1120] p-4 rounded border border-slate-800 no-print shadow-sm">
+        <header className="flex flex-col md:flex-row md:justify-between md:items-end gap-2 no-print">
           <div>
-            <h1 className="text-xl font-bold text-white tracking-tight">
+            <h1 className="text-2xl font-bold text-white tracking-tight">
               Inventory
             </h1>
+            <p className="text-sm text-slate-500">Manage your equipment catalog.</p>
           </div>
           <div className="flex flex-wrap gap-2 items-center">
             <div className="relative group flex-1 md:flex-none">
               <Search
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-brand-500 transition-colors"
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-zinc-400 transition-colors"
                 size={16}
               />
               <input
                 type="text"
                 placeholder="Search items..."
-                className="w-full md:w-64 pl-9 pr-4 py-1.5 bg-slate-900 border border-slate-700 rounded text-sm text-slate-200 placeholder-slate-600 focus:ring-1 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all shadow-sm"
+                className="w-full md:w-64 pl-9 pr-4 py-1.5 bg-slate-900 border border-slate-700 rounded text-sm text-slate-200 placeholder-slate-600 focus:ring-1 focus:ring-zinc-600 focus:border-zinc-500 outline-none transition-all shadow-sm"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
@@ -730,7 +731,7 @@ const Inventory: React.FC = () => {
               <h4 className="font-bold text-base text-white">
                 {selectedItem.name}
               </h4>
-              <p className="text-xs text-brand-500 font-medium tracking-wide font-mono uppercase">
+              <p className="text-xs text-zinc-500 font-medium tracking-wide font-mono uppercase">
                 {selectedItem.brand} • {selectedItem.model}
               </p>
 
@@ -786,7 +787,7 @@ const Inventory: React.FC = () => {
             {/* Comments Section */}
             <div>
               <h5 className="font-semibold text-xs mb-3 flex items-center gap-2 text-white border-t border-slate-800 pt-4">
-                <MessageSquare size={14} className="text-brand-500" /> Activity
+                <MessageSquare size={14} className="text-zinc-500" /> Activity
                 Log
               </h5>
               <div className="space-y-2 mb-3">
@@ -815,7 +816,7 @@ const Inventory: React.FC = () => {
 
               <form onSubmit={handlePostComment} className="flex gap-2">
                 <input
-                  className="flex-1 bg-slate-950 border border-slate-700 rounded px-2 py-1.5 text-xs text-slate-200 placeholder-slate-600 focus:ring-1 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all"
+                  className="flex-1 bg-slate-950 border border-slate-700 rounded px-2 py-1.5 text-xs text-slate-200 placeholder-slate-600 focus:ring-1 focus:ring-zinc-600 focus:border-zinc-500 outline-none transition-all"
                   placeholder="Add a note..."
                   value={commentText}
                   onChange={(e) => setCommentText(e.target.value)}
@@ -990,7 +991,7 @@ const LocationsManagement: React.FC = () => {
         <div
           className={`p-2 rounded ${
             loc.type === "WAREHOUSE"
-              ? "bg-brand-500/10 text-brand-500"
+              ? "bg-zinc-800/50 text-zinc-400"
               : loc.type === "CLIENT"
                 ? "bg-emerald-500/10 text-emerald-500"
                 : "bg-slate-800/50 text-slate-400"
@@ -1020,7 +1021,7 @@ const LocationsManagement: React.FC = () => {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
-      <header className="flex justify-between items-end">
+      <header className="flex flex-col md:flex-row md:justify-between md:items-end gap-2 no-print">
         <div>
           <h1 className="text-2xl font-bold text-white tracking-tight">
             Locations & Clients
@@ -1042,7 +1043,7 @@ const LocationsManagement: React.FC = () => {
         {/* Internal Storage */}
         <section>
           <div className="flex items-center gap-2 mb-4 pb-2 border-b border-slate-800">
-            <Building2 className="text-brand-500" size={18} />
+            <Building2 className="text-zinc-500" size={18} />
             <h2 className="text-sm font-semibold text-white uppercase tracking-wider">
               Internal Storage
             </h2>
@@ -1250,16 +1251,15 @@ const Movements: React.FC = () => {
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <header>
-        <h1 className="text-2xl font-bold text-white tracking-tight flex items-center gap-3">
-          <div className="p-2 bg-brand-500/10 rounded-lg border border-brand-500/20">
-            <ArrowRightLeft className="text-brand-500" size={24} />
-          </div>
-          Record Movement
-        </h1>
-        <p className="text-sm text-zinc-400 mt-2">
-          Check in, check out, or transfer equipment.
-        </p>
+      <header className="flex flex-col md:flex-row md:justify-between md:items-end gap-2 no-print">
+        <div>
+          <h1 className="text-2xl font-bold text-white tracking-tight">
+            Record Movement
+          </h1>
+          <p className="text-sm text-slate-500">
+            Check in, check out, or transfer equipment.
+          </p>
+        </div>
       </header>
 
       {success && (
@@ -1273,9 +1273,8 @@ const Movements: React.FC = () => {
 
       <form
         onSubmit={handleSubmit}
-        className="bg-zinc-900/40 backdrop-blur-md p-6 md:p-8 rounded-xl border border-white/5 shadow-glass space-y-8 relative overflow-hidden"
+        className="bg-zinc-900/40 backdrop-blur-sm border border-white/5 rounded-xl shadow-glass space-y-8 p-6 md:p-8"
       >
-        <div className="absolute top-0 right-0 w-64 h-64 bg-brand-500/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />
         {/* Type Selection */}
         <div>
           <label className="block text-xs font-bold text-zinc-400 mb-3 uppercase tracking-wider">
@@ -1289,7 +1288,7 @@ const Movements: React.FC = () => {
                 onClick={() => setFormData({ ...formData, type: t })}
                 className={`py-3 text-xs font-bold uppercase tracking-wide rounded-lg border-2 transition-all duration-200 ${
                   formData.type === t
-                    ? "bg-brand-500/10 border-brand-500 text-brand-400 shadow-lg shadow-brand-500/20"
+                    ? "bg-zinc-700 border-zinc-600 text-white shadow-sm"
                     : "bg-zinc-900/40 border-zinc-800 text-zinc-500 hover:border-zinc-700 hover:text-zinc-300"
                 }`}
               >
@@ -1307,7 +1306,7 @@ const Movements: React.FC = () => {
             </label>
             <div className="relative group">
               <select
-                className="w-full bg-zinc-950/50 border border-zinc-800 rounded-lg px-4 py-3.5 text-zinc-200 outline-none focus:ring-2 focus:ring-brand-500/50 focus:border-brand-500 transition-all appearance-none text-sm group-hover:border-zinc-700"
+                className="w-full bg-zinc-950/50 border border-zinc-800 rounded-lg px-4 py-3.5 text-zinc-200 outline-none focus:ring-2 focus:ring-zinc-600 focus:border-zinc-500 transition-all appearance-none text-sm group-hover:border-zinc-700"
                 value={formData.itemId}
                 onChange={(e) =>
                   setFormData({ ...formData, itemId: e.target.value })
@@ -1321,7 +1320,7 @@ const Movements: React.FC = () => {
                   </option>
                 ))}
               </select>
-              <div className="absolute right-4 top-3.5 pointer-events-none text-zinc-500 group-hover:text-brand-400 transition-colors">
+              <div className="absolute right-4 top-3.5 pointer-events-none text-zinc-500 group-hover:text-zinc-400 transition-colors">
                 <ChevronRight size={18} className="rotate-90" />
               </div>
             </div>
@@ -1339,7 +1338,7 @@ const Movements: React.FC = () => {
                   <div className="text-[11px] text-zinc-400 mt-0.5">
                     {selectedItem.category} • Current Stock:{" "}
                     <span
-                      className={`font-mono font-bold ${selectedItem.currentStock <= selectedItem.minStockThreshold ? "text-red-400" : "text-brand-400"}`}
+                      className={`font-mono font-bold ${selectedItem.currentStock <= selectedItem.minStockThreshold ? "text-red-400" : "text-zinc-400"}`}
                     >
                       {selectedItem.currentStock}
                     </span>
@@ -1357,7 +1356,7 @@ const Movements: React.FC = () => {
             <input
               type="number"
               min="1"
-              className="w-full bg-zinc-950/50 border border-zinc-800 rounded-lg px-4 py-3.5 text-zinc-200 outline-none focus:ring-2 focus:ring-brand-500/50 focus:border-brand-500 transition-all text-sm font-mono placeholder:text-zinc-700"
+              className="w-full bg-zinc-950/50 border border-zinc-800 rounded-lg px-4 py-3.5 text-zinc-200 outline-none focus:ring-2 focus:ring-zinc-600 focus:border-zinc-500 transition-all text-sm font-mono placeholder:text-zinc-700"
               value={formData.quantity}
               onChange={(e) =>
                 setFormData({ ...formData, quantity: parseInt(e.target.value) })
@@ -1376,7 +1375,7 @@ const Movements: React.FC = () => {
               </label>
               <div className="relative group">
                 <select
-                  className="w-full bg-zinc-950/50 border border-zinc-800 rounded-lg px-4 py-3.5 text-zinc-200 outline-none focus:ring-2 focus:ring-brand-500/50 focus:border-brand-500 transition-all appearance-none text-sm group-hover:border-zinc-700"
+                  className="w-full bg-zinc-950/50 border border-zinc-800 rounded-lg px-4 py-3.5 text-zinc-200 outline-none focus:ring-2 focus:ring-zinc-600 focus:border-zinc-500 transition-all appearance-none text-sm group-hover:border-zinc-700"
                   value={formData.fromLocationId}
                   onChange={(e) =>
                     setFormData({ ...formData, fromLocationId: e.target.value })
@@ -1385,7 +1384,7 @@ const Movements: React.FC = () => {
                 >
                   {renderLocationOptions()}
                 </select>
-                <div className="absolute right-4 top-3.5 pointer-events-none text-zinc-500 group-hover:text-brand-400 transition-colors">
+                <div className="absolute right-4 top-3.5 pointer-events-none text-zinc-500 group-hover:text-zinc-400 transition-colors">
                   <ChevronRight size={18} className="rotate-90" />
                 </div>
               </div>
@@ -1400,7 +1399,7 @@ const Movements: React.FC = () => {
               </label>
               <div className="relative group">
                 <select
-                  className="w-full bg-zinc-950/50 border border-zinc-800 rounded-lg px-4 py-3.5 text-zinc-200 outline-none focus:ring-2 focus:ring-brand-500/50 focus:border-brand-500 transition-all appearance-none text-sm group-hover:border-zinc-700"
+                  className="w-full bg-zinc-950/50 border border-zinc-800 rounded-lg px-4 py-3.5 text-zinc-200 outline-none focus:ring-2 focus:ring-zinc-600 focus:border-zinc-500 transition-all appearance-none text-sm group-hover:border-zinc-700"
                   value={formData.toLocationId}
                   onChange={(e) =>
                     setFormData({ ...formData, toLocationId: e.target.value })
@@ -1409,7 +1408,7 @@ const Movements: React.FC = () => {
                 >
                   {renderLocationOptions()}
                 </select>
-                <div className="absolute right-4 top-3.5 pointer-events-none text-zinc-500 group-hover:text-brand-400 transition-colors">
+                <div className="absolute right-4 top-3.5 pointer-events-none text-zinc-500 group-hover:text-zinc-400 transition-colors">
                   <ChevronRight size={18} className="rotate-90" />
                 </div>
               </div>
@@ -1423,7 +1422,7 @@ const Movements: React.FC = () => {
             Comment / Reference
           </label>
           <textarea
-            className="w-full bg-zinc-950/50 border border-zinc-800 rounded-lg px-4 py-3 text-zinc-200 outline-none focus:ring-2 focus:ring-brand-500/50 focus:border-brand-500 transition-all h-24 resize-none text-sm placeholder:text-zinc-700"
+            className="w-full bg-zinc-950/50 border border-zinc-800 rounded-lg px-4 py-3 text-zinc-200 outline-none focus:ring-2 focus:ring-zinc-600 focus:border-zinc-500 transition-all h-24 resize-none text-sm placeholder:text-zinc-700"
             placeholder="E.g., Order #1234 or Event TechConf"
             value={formData.note}
             onChange={(e) => setFormData({ ...formData, note: e.target.value })}
@@ -1433,7 +1432,7 @@ const Movements: React.FC = () => {
         <div className="pt-2 relative z-10">
           <Button
             type="submit"
-            className="w-full py-4 text-base font-bold bg-gradient-to-r from-brand-600 to-brand-500 hover:from-brand-500 hover:to-brand-400 shadow-lg shadow-brand-500/30 hover:shadow-brand-500/50 transition-all duration-200"
+            className="w-full py-4 text-base font-bold"
             size="lg"
           >
             <PackageCheck size={20} className="mr-2" />
@@ -1470,8 +1469,8 @@ const AIAssistant: React.FC = () => {
     <div className="max-w-3xl mx-auto space-y-6 animate-in fade-in duration-500">
       <header>
         <h1 className="text-2xl font-bold text-white flex items-center gap-3">
-          <div className="p-2 bg-brand-500/10 rounded border border-brand-500/20">
-            <Bot className="text-brand-500" />
+          <div className="p-2 bg-zinc-800 rounded border border-zinc-700">
+            <Bot className="text-zinc-400" />
           </div>
           AI Inventory Analyst
         </h1>
@@ -1485,14 +1484,14 @@ const AIAssistant: React.FC = () => {
           <input
             type="text"
             placeholder="E.g., 'Which items are running low?' or 'Summarize recent camera movements'"
-            className="w-full bg-[#020617] border border-slate-700 rounded pl-5 pr-14 py-4 text-slate-200 placeholder-slate-500 focus:ring-1 focus:ring-brand-500 focus:border-brand-500 outline-none shadow-inner transition-all"
+            className="w-full bg-[#020617] border border-slate-700 rounded pl-5 pr-14 py-4 text-slate-200 placeholder-slate-500 focus:ring-1 focus:ring-zinc-600 focus:border-zinc-500 outline-none shadow-inner transition-all"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
           <button
             type="submit"
             disabled={loading}
-            className="absolute right-2 top-2 p-2 bg-brand-600 text-white rounded hover:bg-brand-500 disabled:opacity-50 transition-colors shadow-sm"
+            className="absolute right-2 top-2 p-2 bg-zinc-700 text-white rounded hover:bg-zinc-600 disabled:opacity-50 transition-colors shadow-sm"
           >
             {loading ? (
               <div className="animate-spin h-5 w-5 border-2 border-white/30 border-t-white rounded-full" />
@@ -1505,7 +1504,7 @@ const AIAssistant: React.FC = () => {
         {(response || loading) && (
           <div className="bg-[#020617] rounded p-6 min-h-[100px] border border-slate-800 animate-in fade-in slide-in-from-top-2 duration-300">
             {loading ? (
-              <div className="flex items-center gap-3 text-brand-400 animate-pulse">
+              <div className="flex items-center gap-3 text-slate-400 animate-pulse">
                 <Bot size={20} />
                 <span className="font-medium">Analyzing inventory data...</span>
               </div>
@@ -1528,7 +1527,7 @@ const AIAssistant: React.FC = () => {
           <button
             key={q}
             onClick={() => setQuery(q)}
-            className="p-4 bg-[#0b1120] border border-slate-800 rounded text-sm text-slate-400 hover:border-brand-500/50 hover:text-brand-400 hover:bg-[#151f32] text-left transition-all"
+            className="p-4 bg-zinc-900/40 border border-slate-800 rounded text-sm text-slate-400 hover:border-slate-600 hover:text-white hover:bg-zinc-800/50 text-left transition-all"
           >
             {q}
           </button>
@@ -1576,14 +1575,14 @@ const AppContent: React.FC = () => {
   };
 
   return (
-    <div className="flex min-h-screen font-sans text-slate-300 selection:bg-brand-500/30 selection:text-brand-200">
+    <div className="flex min-h-screen font-sans text-slate-300 selection:bg-zinc-700 selection:text-white">
       {/* Sidebar - Desktop with ambient texture */}
       <aside
         className={`w-64 sidebar-bg border-r border-slate-800 fixed h-full z-20 transition-transform duration-300 ease-in-out transform ${sidebarOpen ? "translate-x-0" : "-translate-x-full"} md:translate-x-0 flex flex-col no-print shadow-2xl`}
       >
         <div className="relative z-10 p-5 border-b border-white/10 backdrop-blur-sm">
           <div className="flex items-center gap-3 font-bold text-lg text-white tracking-wide">
-            <div className="bg-brand-600 p-1.5 rounded shadow-lg shadow-brand-500/30">
+            <div className="bg-zinc-700 p-1.5 rounded shadow-lg">
               <Box size={20} className="text-white" />
             </div>
             StockFlow
@@ -1673,7 +1672,7 @@ const AppContent: React.FC = () => {
         {/* Mobile Header */}
         <div className="md:hidden flex justify-between items-center mb-6 bg-[#0b1120] border border-slate-800 p-4 rounded sticky top-4 z-10 shadow-lg no-print">
           <div className="font-bold text-lg text-white flex items-center gap-2">
-            <Box size={20} className="text-brand-500" /> StockFlow
+            <Box size={20} className="text-zinc-400" /> StockFlow
           </div>
           <button
             onClick={() => setSidebarOpen(true)}

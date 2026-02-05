@@ -34,16 +34,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     switch (req.method) {
       case "GET":
-        // Récupérer les 50 derniers mouvements avec relations
+        // Récupérer les 50 derniers mouvements SANS relations (pour éviter les erreurs avec items supprimés)
+        // Le frontend n'utilise que les IDs, pas les objets complets
         const movements = await prisma.movement.findMany({
           take: 50,
           orderBy: { createdAt: "desc" },
-          include: {
-            item: true,
-            fromLocation: true,
-            toLocation: true,
-            createdBy: true,
-          },
         });
         return res.status(200).json(movements);
 

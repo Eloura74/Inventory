@@ -16,13 +16,15 @@ export const Button: React.FC<ButtonProps> = ({
   const baseStyles = "inline-flex items-center justify-center rounded font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-offset-slate-950 disabled:opacity-50 disabled:cursor-not-allowed tracking-wide";
   
   const variants = {
-    // Industrial Orange Primary
-    primary: "bg-brand-600 text-white hover:bg-brand-500 shadow-sm shadow-brand-500/20 border border-transparent",
-    // Dark grey for secondary actions
+    // Style sobre et premium - zinc/slate
+    primary: "bg-zinc-700 text-white hover:bg-zinc-600 shadow-sm border border-zinc-600 hover:border-zinc-500 transition-all",
+    // Secondary actions
     secondary: "bg-slate-800 text-slate-200 border border-slate-700 hover:bg-slate-700 hover:text-white",
-    // Outline for exports/secondary
+    // Outline pour les actions légères
     outline: "bg-transparent text-slate-400 border border-slate-700 hover:border-slate-500 hover:text-white hover:bg-slate-800/30",
+    // Danger pour les suppressions
     danger: "bg-red-900/20 text-red-400 border border-red-900/30 hover:bg-red-900/30 hover:border-red-800/50",
+    // Ghost transparent
     ghost: "bg-transparent text-slate-400 hover:bg-slate-800/50 hover:text-slate-200"
   };
 
