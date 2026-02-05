@@ -487,7 +487,9 @@ const Inventory: React.FC = () => {
     if (editMode && itemForm.id) {
       updateItem(itemForm.id, itemForm);
     } else {
-      addItem(itemForm as Omit<Item, "id">);
+      // Extract only the fields accepted by API (no currentStock, no status)
+      const { id, currentStock, status, ...validFields } = itemForm;
+      addItem(validFields as typeof validFields & { tags: string[] });
     }
     setIsModalOpen(false);
   };
