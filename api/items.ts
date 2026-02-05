@@ -15,8 +15,6 @@ const ItemSchema = z.object({
   tags: z.array(z.string()),
   imageUrl: z.string().url(),
   description: z.string(),
-  currentStock: z.number().optional(),
-  status: z.enum(["OK", "LOW", "MAINTENANCE", "UNAVAILABLE"]).optional(),
 });
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -51,7 +49,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
 
         const newItem = await prisma.item.create({
-          data: validation.data,
+          data: {
+            ...validation.data,
+            currentStock: 0, // Initialize stock to 0
+          },
         });
         return res.status(201).json(newItem);
 
