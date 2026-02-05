@@ -1,6 +1,9 @@
 import { VercelRequest, VercelResponse } from "@vercel/node";
+import { PrismaClient } from "@prisma/client";
 import { z } from "zod";
-import prisma from "../lib/prisma";
+
+// Prisma Client Singleton pour Vercel Serverless
+const prisma = new PrismaClient();
 
 const LocationSchema = z.object({
   name: z.string().min(1),
