@@ -1,6 +1,9 @@
 import { VercelRequest, VercelResponse } from "@vercel/node";
-import prisma from "../lib/prisma";
+import { PrismaClient } from "@prisma/client";
 import { z } from "zod";
+
+// Prisma Client Singleton pour Vercel Serverless
+const prisma = new PrismaClient();
 
 const MovementSchema = z.object({
   type: z.enum(["IN", "OUT", "TRANSFER", "ADJUST"]),
