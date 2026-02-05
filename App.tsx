@@ -1239,10 +1239,13 @@ const Movements: React.FC = () => {
   return (
     <div className="max-w-4xl mx-auto space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <header>
-        <h1 className="text-2xl font-bold text-white tracking-tight">
+        <h1 className="text-2xl font-bold text-white tracking-tight flex items-center gap-3">
+          <div className="p-2 bg-brand-500/10 rounded-lg border border-brand-500/20">
+            <ArrowRightLeft className="text-brand-500" size={24} />
+          </div>
           Record Movement
         </h1>
-        <p className="text-sm text-slate-400">
+        <p className="text-sm text-zinc-400 mt-2">
           Check in, check out, or transfer equipment.
         </p>
       </header>
@@ -1263,7 +1266,7 @@ const Movements: React.FC = () => {
         <div className="absolute top-0 right-0 w-64 h-64 bg-brand-500/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />
         {/* Type Selection */}
         <div>
-          <label className="block text-xs font-medium text-slate-400 mb-3 uppercase tracking-wider">
+          <label className="block text-xs font-bold text-zinc-400 mb-3 uppercase tracking-wider">
             Movement Type
           </label>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -1272,10 +1275,10 @@ const Movements: React.FC = () => {
                 key={t}
                 type="button"
                 onClick={() => setFormData({ ...formData, type: t })}
-                className={`py-3 text-xs font-bold uppercase tracking-wide rounded border transition-all duration-200 ${
+                className={`py-3 text-xs font-bold uppercase tracking-wide rounded-lg border-2 transition-all duration-200 ${
                   formData.type === t
-                    ? "bg-brand-600 border-brand-500 text-white shadow-md"
-                    : "bg-[#020617] border-slate-800 text-slate-400 hover:border-slate-600 hover:text-slate-200"
+                    ? "bg-brand-500/10 border-brand-500 text-brand-400 shadow-lg shadow-brand-500/20"
+                    : "bg-zinc-900/40 border-zinc-800 text-zinc-500 hover:border-zinc-700 hover:text-zinc-300"
                 }`}
               >
                 {t}
@@ -1415,8 +1418,13 @@ const Movements: React.FC = () => {
           />
         </div>
 
-        <div className="pt-2">
-          <Button type="submit" className="w-full py-3" size="lg">
+        <div className="pt-2 relative z-10">
+          <Button
+            type="submit"
+            className="w-full py-4 text-base font-bold bg-gradient-to-r from-brand-600 to-brand-500 hover:from-brand-500 hover:to-brand-400 shadow-lg shadow-brand-500/30 hover:shadow-brand-500/50 transition-all duration-200"
+            size="lg"
+          >
+            <PackageCheck size={20} className="mr-2" />
             Confirm Movement
           </Button>
         </div>
