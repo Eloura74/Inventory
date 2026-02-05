@@ -6,6 +6,7 @@ import React, {
   createContext,
   useCallback,
 } from "react";
+import toast, { Toaster } from 'react-hot-toast';
 import {
   LayoutDashboard,
   Box,
@@ -60,6 +61,8 @@ import {
 } from "./types";
 import { Button } from "./components/Button";
 import { Modal } from "./components/Modal";
+import { ConfirmDialog } from "./components/ConfirmDialog";
+import { DashboardSkeleton, InventoryListSkeleton, Skeleton } from "./components/Skeleton";
 import { analyzeInventory } from "./services/geminiService";
 import { api } from "./services/api";
 
@@ -74,6 +77,9 @@ interface AppState {
 }
 
 interface AppContextType extends AppState {
+  // Loading state
+  isLoading: boolean;
+
   // Items CRUD
   addItem: (item: Omit<Item, "id">) => void;
   updateItem: (id: string, item: Partial<Item>) => void;
@@ -192,7 +198,11 @@ const Card: React.FC<{
 
 // --- DASHBOARD ---
 const Dashboard: React.FC = () => {
-  const { inventory, movements } = useAppContext();
+  const { inventory, movements, isLoading } = useAppContext();
+
+  if (isLoading) {
+    return <DashboardSkeleton />;
+  }
 
   const stats = useMemo(() => {
     const totalItems = inventory.reduce((acc, i) => acc + i.currentStock, 0);
@@ -319,7 +329,7 @@ const Dashboard: React.FC = () => {
         >
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={categoryData} barSize={40}>
+              <BarChart data={categoryData} barSize={48}>
                 <CartesianGrid
                   strokeDasharray="3 3"
                   vertical={false}
@@ -342,27 +352,42 @@ const Dashboard: React.FC = () => {
                 <Tooltip
                   cursor={{ fill: "rgba(255,255,255,0.03)" }}
                   contentStyle={{
-                    backgroundColor: "rgba(9, 9, 11, 0.9)",
-                    backdropFilter: "blur(8px)",
-                    borderColor: "rgba(255,255,255,0.1)",
+                    backgroundColor: "rgba(9, 9, 11, 0.95)",
+                    backdropFilter: "blur(12px)",
+                    borderColor: "rgba(255,255,255,0.15)",
                     color: "#f4f4f5",
-                    borderRadius: "8px",
+                    borderRadius: "10px",
                     fontSize: "12px",
-                    boxShadow: "0 4px 20px rgba(0,0,0,0.5)",
+                    boxShadow: "0 8px 32px rgba(0,0,0,0.6)",
                   }}
                   itemStyle={{ color: "#e4e4e7" }}
                 />
                 <defs>
-                  <linearGradient id="goldGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#fbbf24" stopOpacity={1} />
-                    <stop offset="100%" stopColor="#b45309" stopOpacity={0.8} />
+                  {/* Gradient principal avec effet 3D */}
+                  <linearGradient id="barGradient3D" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#71717a" stopOpacity={1} />
+                    <stop offset="50%" stopColor="#52525b" stopOpacity={0.95} />
+                    <stop offset="100%" stopColor="#3f3f46" stopOpacity={0.85} />
                   </linearGradient>
+                  {/* Reflet lumineux */}
+                  <filter id="barShadow" x="-50%" y="-50%" width="200%" height="200%">
+                    <feGaussianBlur in="SourceAlpha" stdDeviation="4"/>
+                    <feOffset dx="0" dy="4" result="offsetblur"/>
+                    <feComponentTransfer>
+                      <feFuncA type="linear" slope="0.3"/>
+                    </feComponentTransfer>
+                    <feMerge>
+                      <feMergeNode/>
+                      <feMergeNode in="SourceGraphic"/>
+                    </feMerge>
+                  </filter>
                 </defs>
                 <Bar
                   dataKey="value"
-                  fill="url(#goldGradient)"
-                  radius={[6, 6, 0, 0]}
+                  fill="url(#barGradient3D)"
+                  radius={[8, 8, 0, 0]}
                   animationDuration={1500}
+                  filter="url(#barShadow)"
                 />
               </BarChart>
             </ResponsiveContainer>
@@ -428,6 +453,7 @@ const Dashboard: React.FC = () => {
 const Inventory: React.FC = () => {
   const {
     inventory,
+    isLoading,
     addItem,
     updateItem,
     deleteItem,
@@ -442,6 +468,13 @@ const Inventory: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [itemForm, setItemForm] = useState<Partial<Item>>({});
+  
+  // Confirm Dialog State
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    itemId: string | null;
+    itemName: string;
+  }>({ isOpen: false, itemId: null, itemName: '' });
 
   const filtered = useMemo(() => {
     return inventory.filter(
@@ -485,9 +518,17 @@ const Inventory: React.FC = () => {
     setSelectedItem(null);
   };
 
-  const handleDelete = (id: string) => {
-    if (window.confirm("Are you sure you want to delete this item?")) {
-      deleteItem(id);
+  const handleDelete = (item: InventoryItem) => {
+    setConfirmDialog({
+      isOpen: true,
+      itemId: item.id,
+      itemName: item.name,
+    });
+  };
+
+  const confirmDelete = () => {
+    if (confirmDialog.itemId) {
+      deleteItem(confirmDialog.itemId);
       setSelectedItem(null);
     }
   };
@@ -547,6 +588,18 @@ const Inventory: React.FC = () => {
   const itemComments = selectedItem
     ? getCommentsForEntity("ITEM", selectedItem.id)
     : [];
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6 animate-in fade-in duration-500">
+        <div className="space-y-2">
+          <Skeleton className="h-8 w-48" />
+          <Skeleton className="h-4 w-64" />
+        </div>
+        <InventoryListSkeleton />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
@@ -681,7 +734,7 @@ const Inventory: React.FC = () => {
                           <Edit size={14} />
                         </button>
                         <button
-                          onClick={() => handleDelete(item.id)}
+                          onClick={() => handleDelete(item)}
                           className="p-1 hover:bg-slate-700 rounded text-slate-400 hover:text-red-400 transition-colors"
                         >
                           <Trash2 size={14} />
@@ -946,14 +999,31 @@ const Inventory: React.FC = () => {
           </div>
         </form>
       </Modal>
+
+      {/* Confirm Delete Dialog */}
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        onClose={() => setConfirmDialog({ isOpen: false, itemId: null, itemName: '' })}
+        onConfirm={confirmDelete}
+        title="Delete Item"
+        message={`Are you sure you want to delete "${confirmDialog.itemName}"? This action cannot be undone.`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="danger"
+      />
     </div>
   );
 };
 
 // --- LOCATIONS & CLIENTS MANAGEMENT ---
 const LocationsManagement: React.FC = () => {
-  const { locations, addLocation, deleteLocation } = useAppContext();
+  const { locations, addLocation, deleteLocation, isLoading } = useAppContext();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    locationId: string | null;
+    locationName: string;
+  }>({ isOpen: false, locationId: null, locationName: '' });
   const [newLoc, setNewLoc] = useState<{
     name: string;
     type: LocationType;
@@ -985,6 +1055,20 @@ const LocationsManagement: React.FC = () => {
     setNewLoc({ name: "", type: "WAREHOUSE", parentId: "", address: "" });
   };
 
+  const handleDeleteLocation = (loc: Location) => {
+    setConfirmDialog({
+      isOpen: true,
+      locationId: loc.id,
+      locationName: loc.name,
+    });
+  };
+
+  const confirmDeleteLocation = () => {
+    if (confirmDialog.locationId) {
+      deleteLocation(confirmDialog.locationId);
+    }
+  };
+
   const LocationCard: React.FC<{ loc: Location }> = ({ loc }) => (
     <div className="bg-[#0b1120] border border-slate-800 rounded p-4 flex justify-between items-center group hover:border-slate-700 transition-colors shadow-sm">
       <div className="flex items-center gap-3">
@@ -1011,7 +1095,7 @@ const LocationsManagement: React.FC = () => {
         </div>
       </div>
       <button
-        onClick={() => deleteLocation(loc.id)}
+        onClick={() => handleDeleteLocation(loc)}
         className="opacity-0 group-hover:opacity-100 p-2 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded transition-all"
       >
         <Trash2 size={16} />
@@ -1171,6 +1255,18 @@ const LocationsManagement: React.FC = () => {
           </div>
         </form>
       </Modal>
+
+      {/* Confirm Delete Dialog */}
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        onClose={() => setConfirmDialog({ isOpen: false, locationId: null, locationName: '' })}
+        onConfirm={confirmDeleteLocation}
+        title="Delete Location"
+        message={`Are you sure you want to delete "${confirmDialog.locationName}"? This action cannot be undone.`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="danger"
+      />
     </div>
   );
 };
@@ -1544,7 +1640,6 @@ enum Screen {
   INVENTORY = "INVENTORY",
   MOVEMENTS = "MOVEMENTS",
   LOCATIONS = "LOCATIONS",
-  AI = "AI",
 }
 
 const AppContent: React.FC = () => {
@@ -1562,8 +1657,6 @@ const AppContent: React.FC = () => {
         return <Movements />;
       case Screen.LOCATIONS:
         return <LocationsManagement />;
-      case Screen.AI:
-        return <AIAssistant />;
       default:
         return <Dashboard />;
     }
@@ -1614,7 +1707,7 @@ const AppContent: React.FC = () => {
             />
           </div>
 
-          <div className="mb-4">
+          <div>
             <p className="px-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">
               Management
             </p>
@@ -1623,18 +1716,6 @@ const AppContent: React.FC = () => {
               label="Locations & Clients"
               active={currentScreen === Screen.LOCATIONS}
               onClick={() => handleNav(Screen.LOCATIONS)}
-            />
-          </div>
-
-          <div>
-            <p className="px-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">
-              Intelligence
-            </p>
-            <SidebarItem
-              icon={Bot}
-              label="AI Analyst"
-              active={currentScreen === Screen.AI}
-              onClick={() => handleNav(Screen.AI)}
             />
           </div>
         </nav>
@@ -1759,48 +1840,62 @@ const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // --- CRUD Handlers ---
 
   const addItem = useCallback(async (itemData: Omit<Item, "id">) => {
+    const loadingToast = toast.loading('Creating item...');
     try {
       const created = await api.items.create(itemData);
       setItems((prev) => [...prev, created]);
+      toast.success(`Item "${itemData.name}" created successfully!`, { id: loadingToast });
     } catch (err) {
       console.error("Failed to add item", err);
-      // Fallback or Toast here
+      toast.error('Failed to create item. Please try again.', { id: loadingToast });
     }
   }, []);
 
   const updateItem = useCallback(async (id: string, updates: Partial<Item>) => {
+    const loadingToast = toast.loading('Updating item...');
     try {
       const updated = await api.items.update(id, updates);
       setItems((prev) => prev.map((i) => (i.id === id ? updated : i)));
+      toast.success('Item updated successfully!', { id: loadingToast });
     } catch (e) {
       console.error(e);
+      toast.error('Failed to update item.', { id: loadingToast });
     }
   }, []);
 
   const deleteItem = useCallback(async (id: string) => {
+    const loadingToast = toast.loading('Deleting item...');
     try {
       await api.items.delete(id);
       setItems((prev) => prev.filter((i) => i.id !== id));
+      toast.success('Item deleted successfully!', { id: loadingToast });
     } catch (e) {
       console.error(e);
+      toast.error('Failed to delete item.', { id: loadingToast });
     }
   }, []);
 
   const addLocation = useCallback(async (locData: Omit<Location, "id">) => {
+    const loadingToast = toast.loading('Creating location...');
     try {
       const created = await api.locations.create(locData);
       setLocations((prev) => [...prev, created]);
+      toast.success(`Location "${locData.name}" created!`, { id: loadingToast });
     } catch (e) {
       console.error(e);
+      toast.error('Failed to create location.', { id: loadingToast });
     }
   }, []);
 
   const deleteLocation = useCallback(async (id: string) => {
+    const loadingToast = toast.loading('Deleting location...');
     try {
       await api.locations.delete(id);
       setLocations((prev) => prev.filter((l) => l.id !== id));
+      toast.success('Location deleted!', { id: loadingToast });
     } catch (e) {
       console.error(e);
+      toast.error('Failed to delete location.', { id: loadingToast });
     }
   }, []);
 
@@ -1808,6 +1903,7 @@ const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     async (
       movementData: Omit<StockMovement, "id" | "createdAt" | "createdBy">,
     ) => {
+      const loadingToast = toast.loading('Recording movement...');
       try {
         const created = await api.movements.create({
           ...movementData,
@@ -1817,8 +1913,10 @@ const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         // Refresh items to get updated stock instantly
         const updatedItems = await api.items.list(); // Simple re-fetch strategy for consistency
         setItems(updatedItems);
+        toast.success(`Movement recorded successfully!`, { id: loadingToast });
       } catch (e) {
         console.error(e);
+        toast.error('Failed to record movement.', { id: loadingToast });
       }
     },
     [],
@@ -1840,8 +1938,10 @@ const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         });
         // Ajouter au state local
         setComments((prev) => [created, ...prev]);
+        toast.success('Comment posted!');
       } catch (e) {
         console.error("Failed to add comment", e);
+        toast.error('Failed to post comment.');
       }
     },
     [],
@@ -1867,6 +1967,7 @@ const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         movements,
         comments,
         currentUser,
+        isLoading,
         inventory,
         addItem,
         updateItem,
@@ -1886,6 +1987,31 @@ const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 export default function App() {
   return (
     <AppProvider>
+      <Toaster
+        position="top-right"
+        toastOptions={{
+          duration: 3000,
+          style: {
+            background: '#18181b',
+            color: '#f4f4f5',
+            border: '1px solid #3f3f46',
+            borderRadius: '8px',
+            fontSize: '14px',
+          },
+          success: {
+            iconTheme: {
+              primary: '#10b981',
+              secondary: '#18181b',
+            },
+          },
+          error: {
+            iconTheme: {
+              primary: '#ef4444',
+              secondary: '#18181b',
+            },
+          },
+        }}
+      />
       <AppContent />
     </AppProvider>
   );
