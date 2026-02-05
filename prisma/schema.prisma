@@ -1,0 +1,132 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+}
+
+enum Role {
+  ADMIN
+  MANAGER
+  VIEWER
+}
+
+enum MovementType {
+  IN
+  OUT
+  TRANSFER
+  ADJUST
+}
+
+enum ItemStatus {
+  OK
+  LOW
+  MAINTENANCE
+  UNAVAILABLE
+}
+
+enum LocationType {
+  WAREHOUSE
+  ZONE
+  RACK
+  EVENT
+  CLIENT
+  ROOM
+}
+
+model User {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  email     String   @unique
+  name      String
+  role      Role     @default(VIEWER)
+  avatar    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  movements Movement[]
+  comments  Comment[]
+}
+
+model Location {
+  id          String       @id @default(auto()) @map("_id") @db.ObjectId
+  name        String
+  type        LocationType
+  address     String?
+  contactInfo String?
+  
+  parentId    String?      @db.ObjectId
+  parent      Location?    @relation("LocationHierarchy", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  children    Location[]   @relation("LocationHierarchy")
+  
+  fromMovements Movement[] @relation("FromLocation")
+  toMovements   Movement[] @relation("ToLocation")
+
+  comments    Comment[]
+}
+
+model Item {
+  id                String   @id @default(auto()) @map("_id") @db.ObjectId
+  name              String
+  brand             String
+  model             String
+  category          String
+  minStockThreshold Int
+  tags              String[]
+  imageUrl          String
+  description       String
+  
+  // Computed/Cached stock
+  currentStock      Int      @default(0)
+  status            ItemStatus @default(OK)
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  movements         Movement[]
+  comments          Comment[]
+}
+
+model Movement {
+  id             String       @id @default(auto()) @map("_id") @db.ObjectId
+  type           MovementType
+  quantity       Int
+  note           String?
+  
+  itemId         String       @db.ObjectId
+  item           Item         @relation(fields: [itemId], references: [id])
+  
+  fromLocationId String?      @db.ObjectId
+  fromLocation   Location?    @relation("FromLocation", fields: [fromLocationId], references: [id])
+  
+  toLocationId   String?      @db.ObjectId
+  toLocation     Location?    @relation("ToLocation", fields: [toLocationId], references: [id])
+  
+  createdById    String       @db.ObjectId
+  createdBy      User         @relation(fields: [createdById], references: [id])
+  
+  createdAt      DateTime     @default(now())
+}
+
+model Comment {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  text        String
+  entityType  String   // ITEM, MOVEMENT, LOCATION
+  entityId    String   @db.ObjectId // Cannot be polymorphic easily in Prisma, storing ID
+  authorName  String
+  
+  createdById String   @db.ObjectId
+  createdBy   User     @relation(fields: [createdById], references: [id])
+  
+  createdAt   DateTime @default(now())
+  
+  // Optional relations to keep integrity if needed, but entityId allows flexibility
+  itemId      String?  @db.ObjectId
+  item        Item?    @relation(fields: [itemId], references: [id])
+  
+  locationId  String?  @db.ObjectId
+  location    Location? @relation(fields: [locationId], references: [id])
+}
