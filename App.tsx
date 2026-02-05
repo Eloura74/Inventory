@@ -1256,8 +1256,9 @@ const Movements: React.FC = () => {
 
       <form
         onSubmit={handleSubmit}
-        className="bg-[#0b1120] p-6 md:p-8 rounded border border-slate-800 shadow-sm space-y-6"
+        className="bg-zinc-900/40 backdrop-blur-md p-6 md:p-8 rounded-xl border border-white/5 shadow-glass space-y-8 relative overflow-hidden"
       >
+        <div className="absolute top-0 right-0 w-64 h-64 bg-brand-500/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />
         {/* Type Selection */}
         <div>
           <label className="block text-xs font-medium text-slate-400 mb-3 uppercase tracking-wider">
@@ -1284,12 +1285,12 @@ const Movements: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* Item Selection */}
           <div className="md:col-span-2">
-            <label className="block text-xs font-medium text-slate-400 mb-1.5">
+            <label className="block text-xs font-bold text-zinc-400 mb-2 uppercase tracking-wide">
               Item
             </label>
-            <div className="relative">
+            <div className="relative group">
               <select
-                className="w-full bg-[#020617] border border-slate-700 rounded px-4 py-3 text-slate-200 outline-none focus:ring-1 focus:ring-brand-500 focus:border-brand-500 transition-all appearance-none text-sm"
+                className="w-full bg-zinc-950/50 border border-zinc-800 rounded-lg px-4 py-3.5 text-zinc-200 outline-none focus:ring-2 focus:ring-brand-500/50 focus:border-brand-500 transition-all appearance-none text-sm group-hover:border-zinc-700"
                 value={formData.itemId}
                 onChange={(e) =>
                   setFormData({ ...formData, itemId: e.target.value })
@@ -1303,27 +1304,28 @@ const Movements: React.FC = () => {
                   </option>
                 ))}
               </select>
-              <div className="absolute right-4 top-3.5 pointer-events-none text-slate-500">
-                <ChevronRight size={16} className="rotate-90" />
+              <div className="absolute right-4 top-3.5 pointer-events-none text-zinc-500 group-hover:text-brand-400 transition-colors">
+                <ChevronRight size={18} className="rotate-90" />
               </div>
             </div>
             {selectedItem && (
-              <div className="mt-3 flex items-center gap-3 p-3 bg-slate-950/50 rounded border border-slate-800">
+              <div className="mt-4 flex items-center gap-4 p-4 bg-gradient-to-r from-zinc-900 to-zinc-900/50 rounded-lg border border-zinc-800/50 shadow-inner">
                 <img
                   src={selectedItem.imageUrl}
-                  className="w-10 h-10 rounded object-cover border border-slate-700"
+                  className="w-12 h-12 rounded-lg object-cover border border-white/5 shadow-sm"
                   alt=""
                 />
                 <div>
-                  <div className="text-sm font-medium text-slate-200">
+                  <div className="text-sm font-bold text-white tracking-tight">
                     {selectedItem.name}
                   </div>
-                  <div className="text-[10px] text-slate-500">
-                    {selectedItem.category} • Stock:{" "}
-                    <span className="text-slate-300 font-mono">
-                      {selectedItem.minStockThreshold}
-                    </span>{" "}
-                    (Min)
+                  <div className="text-[11px] text-zinc-400 mt-0.5">
+                    {selectedItem.category} • Current Stock:{" "}
+                    <span
+                      className={`font-mono font-bold ${selectedItem.currentStock <= selectedItem.minStockThreshold ? "text-red-400" : "text-brand-400"}`}
+                    >
+                      {selectedItem.currentStock}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -1332,13 +1334,13 @@ const Movements: React.FC = () => {
 
           {/* Quantity */}
           <div>
-            <label className="block text-xs font-medium text-slate-400 mb-1.5">
+            <label className="block text-xs font-bold text-zinc-400 mb-2 uppercase tracking-wide">
               Quantity
             </label>
             <input
               type="number"
               min="1"
-              className="w-full bg-[#020617] border border-slate-700 rounded px-4 py-3 text-slate-200 outline-none focus:ring-1 focus:ring-brand-500 focus:border-brand-500 transition-all text-sm"
+              className="w-full bg-zinc-950/50 border border-zinc-800 rounded-lg px-4 py-3.5 text-zinc-200 outline-none focus:ring-2 focus:ring-brand-500/50 focus:border-brand-500 transition-all text-sm font-mono placeholder:text-zinc-700"
               value={formData.quantity}
               onChange={(e) =>
                 setFormData({ ...formData, quantity: parseInt(e.target.value) })
@@ -1352,12 +1354,12 @@ const Movements: React.FC = () => {
           {(formData.type === MovementType.OUT ||
             formData.type === MovementType.TRANSFER) && (
             <div>
-              <label className="block text-xs font-medium text-slate-400 mb-1.5">
+              <label className="block text-xs font-bold text-zinc-400 mb-2 uppercase tracking-wide">
                 From Location
               </label>
-              <div className="relative">
+              <div className="relative group">
                 <select
-                  className="w-full bg-[#020617] border border-slate-700 rounded px-4 py-3 text-slate-200 outline-none focus:ring-1 focus:ring-brand-500 focus:border-brand-500 transition-all appearance-none text-sm"
+                  className="w-full bg-zinc-950/50 border border-zinc-800 rounded-lg px-4 py-3.5 text-zinc-200 outline-none focus:ring-2 focus:ring-brand-500/50 focus:border-brand-500 transition-all appearance-none text-sm group-hover:border-zinc-700"
                   value={formData.fromLocationId}
                   onChange={(e) =>
                     setFormData({ ...formData, fromLocationId: e.target.value })
@@ -1366,8 +1368,8 @@ const Movements: React.FC = () => {
                 >
                   {renderLocationOptions()}
                 </select>
-                <div className="absolute right-4 top-3.5 pointer-events-none text-slate-500">
-                  <ChevronRight size={16} className="rotate-90" />
+                <div className="absolute right-4 top-3.5 pointer-events-none text-zinc-500 group-hover:text-brand-400 transition-colors">
+                  <ChevronRight size={18} className="rotate-90" />
                 </div>
               </div>
             </div>
@@ -1376,12 +1378,12 @@ const Movements: React.FC = () => {
           {(formData.type === MovementType.IN ||
             formData.type === MovementType.TRANSFER) && (
             <div>
-              <label className="block text-xs font-medium text-slate-400 mb-1.5">
+              <label className="block text-xs font-bold text-zinc-400 mb-2 uppercase tracking-wide">
                 To Location
               </label>
-              <div className="relative">
+              <div className="relative group">
                 <select
-                  className="w-full bg-[#020617] border border-slate-700 rounded px-4 py-3 text-slate-200 outline-none focus:ring-1 focus:ring-brand-500 focus:border-brand-500 transition-all appearance-none text-sm"
+                  className="w-full bg-zinc-950/50 border border-zinc-800 rounded-lg px-4 py-3.5 text-zinc-200 outline-none focus:ring-2 focus:ring-brand-500/50 focus:border-brand-500 transition-all appearance-none text-sm group-hover:border-zinc-700"
                   value={formData.toLocationId}
                   onChange={(e) =>
                     setFormData({ ...formData, toLocationId: e.target.value })
@@ -1390,8 +1392,8 @@ const Movements: React.FC = () => {
                 >
                   {renderLocationOptions()}
                 </select>
-                <div className="absolute right-4 top-3.5 pointer-events-none text-slate-500">
-                  <ChevronRight size={16} className="rotate-90" />
+                <div className="absolute right-4 top-3.5 pointer-events-none text-zinc-500 group-hover:text-brand-400 transition-colors">
+                  <ChevronRight size={18} className="rotate-90" />
                 </div>
               </div>
             </div>
@@ -1400,11 +1402,11 @@ const Movements: React.FC = () => {
 
         {/* Note */}
         <div>
-          <label className="block text-xs font-medium text-slate-400 mb-1.5">
+          <label className="block text-xs font-bold text-zinc-400 mb-2 uppercase tracking-wide">
             Comment / Reference
           </label>
           <textarea
-            className="w-full bg-[#020617] border border-slate-700 rounded px-4 py-3 text-slate-200 outline-none focus:ring-1 focus:ring-brand-500 focus:border-brand-500 transition-all h-20 resize-none text-sm"
+            className="w-full bg-zinc-950/50 border border-zinc-800 rounded-lg px-4 py-3 text-zinc-200 outline-none focus:ring-2 focus:ring-brand-500/50 focus:border-brand-500 transition-all h-24 resize-none text-sm placeholder:text-zinc-700"
             placeholder="E.g., Order #1234 or Event TechConf"
             value={formData.note}
             onChange={(e) => setFormData({ ...formData, note: e.target.value })}
@@ -1680,69 +1682,129 @@ const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     avatar: "https://ui-avatars.com/api/?name=Quentin&background=random",
   });
 
+  // Loading State
+  const [isLoading, setIsLoading] = useState(true);
+
+  // --- Initial Data Fetch ---
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setIsLoading(true);
+        console.log("Fetching API data...");
+        const [fetchedItems, fetchedLocs, fetchedMovs] = await Promise.all([
+          api.items.list().catch((e) => {
+            console.error("Items fetch failed", e);
+            return [];
+          }),
+          api.locations.list().catch((e) => {
+            console.error("Locs fetch failed", e);
+            return [];
+          }),
+          api.movements.list().catch((e) => {
+            console.error("Movs fetch failed", e);
+            return [];
+          }),
+        ]);
+
+        console.log("Data fetched:", { fetchedItems, fetchedLocs });
+        setItems(fetchedItems);
+        setLocations(fetchedLocs);
+        setMovements(fetchedMovs);
+      } catch (error) {
+        console.error("Critical Fetch Error:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
   // Derive Inventory State (Real-time calculation)
   const inventory: InventoryItem[] = useMemo(() => {
     return items.map((item) => {
-      // Calculate Stock
       const stock = movements.reduce((acc, mov) => {
         if (mov.itemId !== item.id) return acc;
-        switch (mov.type) {
-          case MovementType.IN:
-            return acc + mov.quantity;
-          case MovementType.OUT:
-            return acc - mov.quantity;
-          case MovementType.ADJUST:
-            return mov.quantity; // Treated as relative change
-          default:
-            return acc;
-        }
-      }, 0);
+        if (mov.type === MovementType.IN) return acc + mov.quantity;
+        if (mov.type === MovementType.OUT) return acc - mov.quantity;
+        if (mov.type === MovementType.ADJUST) return mov.quantity;
+        return acc;
+      }, 0); // Start from 0 for calculation based on movements, OR use item.currentStock from DB if we trust it
 
-      let status = ItemStatus.OK;
-      if (stock === 0) status = ItemStatus.UNAVAILABLE;
-      else if (stock <= item.minStockThreshold) status = ItemStatus.LOW;
-
-      return { ...item, currentStock: stock, status };
+      // NOTE: Our API updates item.currentStock atomically.
+      // So we can arguably just use item.currentStock + local optimistic updates.
+      // But let's keep this calculation for safety if simple.
+      // Actually, simplistic approach: use item.currentStock from DB (fetched in items).
+      return { ...item, currentStock: item.currentStock || 0 };
     });
   }, [items, movements]);
 
   // --- CRUD Handlers ---
 
-  const addItem = useCallback((itemData: Omit<Item, "id">) => {
-    const newItem: Item = { ...itemData, id: `it_${Date.now()}` };
-    setItems((prev) => [...prev, newItem]);
+  const addItem = useCallback(async (itemData: Omit<Item, "id">) => {
+    try {
+      const created = await api.items.create(itemData);
+      setItems((prev) => [...prev, created]);
+    } catch (err) {
+      console.error("Failed to add item", err);
+      // Fallback or Toast here
+    }
   }, []);
 
-  const updateItem = useCallback((id: string, updates: Partial<Item>) => {
-    setItems((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, ...updates } : item)),
-    );
+  const updateItem = useCallback(async (id: string, updates: Partial<Item>) => {
+    try {
+      const updated = await api.items.update(id, updates);
+      setItems((prev) => prev.map((i) => (i.id === id ? updated : i)));
+    } catch (e) {
+      console.error(e);
+    }
   }, []);
 
-  const deleteItem = useCallback((id: string) => {
-    setItems((prev) => prev.filter((item) => item.id !== id));
+  const deleteItem = useCallback(async (id: string) => {
+    try {
+      await api.items.delete(id);
+      setItems((prev) => prev.filter((i) => i.id !== id));
+    } catch (e) {
+      console.error(e);
+    }
   }, []);
 
-  const addLocation = useCallback((locData: Omit<Location, "id">) => {
-    const newLoc: Location = { ...locData, id: `loc_${Date.now()}` };
-    setLocations((prev) => [...prev, newLoc]);
+  const addLocation = useCallback(async (locData: Omit<Location, "id">) => {
+    try {
+      const created = await api.locations.create(locData);
+      setLocations((prev) => [...prev, created]);
+    } catch (e) {
+      console.error(e);
+    }
   }, []);
 
-  const deleteLocation = useCallback((id: string) => {
-    setLocations((prev) => prev.filter((l) => l.id !== id));
+  const deleteLocation = useCallback(async (id: string) => {
+    try {
+      await api.locations.delete(id);
+      setLocations((prev) => prev.filter((l) => l.id !== id));
+    } catch (e) {
+      console.error(e);
+    }
   }, []);
 
   const addMovement = useCallback(
-    (movementData: Omit<StockMovement, "id" | "createdAt" | "createdBy">) => {
-      const newMovement: StockMovement = {
-        ...movementData,
-        id: `mv_${Date.now()}`,
-        createdAt: new Date().toISOString(),
-        createdBy: currentUser.id,
-      };
-      setMovements((prev) => [...prev, newMovement]);
+    async (
+      movementData: Omit<StockMovement, "id" | "createdAt" | "createdBy">,
+    ) => {
+      try {
+        const created = await api.movements.create({
+          ...movementData,
+          itemId: movementData.itemId,
+        });
+        setMovements((prev) => [created, ...prev]);
+        // Refresh items to get updated stock instantly
+        const updatedItems = await api.items.list(); // Simple re-fetch strategy for consistency
+        setItems(updatedItems);
+      } catch (e) {
+        console.error(e);
+      }
     },
-    [currentUser],
+    [],
   );
 
   const addComment = useCallback(
