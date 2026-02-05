@@ -1633,6 +1633,268 @@ const AIAssistant: React.FC = () => {
   );
 };
 
+// --- LOCATION OVERVIEW ---
+const LocationOverview: React.FC = () => {
+  const { inventory, locations, movements, isLoading } = useAppContext();
+  const [search, setSearch] = useState("");
+  const [selectedLocation, setSelectedLocation] = useState<string>("ALL");
+
+  // Grouper les items par location basé sur les derniers mouvements
+  type LocationGroup = {
+    location: Location;
+    items: Array<{ item: InventoryItem; quantity: number; lastMovement?: Date }>;
+  };
+
+  const itemsByLocation = useMemo(() => {
+    const locationMap: Record<string, LocationGroup> = {};
+
+    // Initialiser avec toutes les locations
+    locations.forEach(loc => {
+      locationMap[loc.id] = { location: loc, items: [] };
+    });
+
+    // Ajouter une catégorie "In Transit" pour les items en mouvement OUT
+    locationMap['IN_TRANSIT'] = { 
+      location: { id: 'IN_TRANSIT', name: 'In Transit / Out', type: 'WAREHOUSE' } as Location,
+      items: []
+    };
+
+    // Analyser les derniers mouvements pour déterminer où sont les items
+    inventory.forEach(item => {
+      const itemMovements = movements
+        .filter(m => m.itemId === item.id)
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+      const lastMovement = itemMovements[0];
+      
+      if (!lastMovement) {
+        // Pas de mouvement, item en stock initial
+        return;
+      }
+
+      if (lastMovement.type === 'IN' && lastMovement.toLocationId) {
+        const locId = lastMovement.toLocationId;
+        if (locationMap[locId]) {
+          locationMap[locId].items.push({
+            item,
+            quantity: item.currentStock,
+            lastMovement: new Date(lastMovement.createdAt)
+          });
+        }
+      } else if (lastMovement.type === 'OUT') {
+        // Item sorti, en transit
+        locationMap['IN_TRANSIT'].items.push({
+          item,
+          quantity: item.currentStock,
+          lastMovement: new Date(lastMovement.createdAt)
+        });
+      } else if (lastMovement.type === 'TRANSFER' && lastMovement.toLocationId) {
+        const locId = lastMovement.toLocationId;
+        if (locationMap[locId]) {
+          locationMap[locId].items.push({
+            item,
+            quantity: item.currentStock,
+            lastMovement: new Date(lastMovement.createdAt)
+          });
+        }
+      }
+    });
+
+    return locationMap;
+  }, [inventory, locations, movements]);
+
+  const filteredLocations = useMemo<LocationGroup[]>(() => {
+    const locs = Object.values(itemsByLocation) as LocationGroup[];
+    
+    if (selectedLocation !== "ALL") {
+      return locs.filter(l => l.location.id === selectedLocation);
+    }
+
+    if (search) {
+      return locs.filter(l => 
+        l.location.name.toLowerCase().includes(search.toLowerCase()) ||
+        l.items.some(i => i.item.name.toLowerCase().includes(search.toLowerCase()))
+      );
+    }
+
+    return locs.filter(l => l.items.length > 0); // Afficher seulement les locations avec items
+  }, [itemsByLocation, search, selectedLocation]);
+
+  const stats = useMemo(() => {
+    const totalLocations = locations.length;
+    const locs = Object.values(itemsByLocation) as LocationGroup[];
+    const activeLocations = locs.filter(l => l.items.length > 0).length;
+    const totalItems = locs.reduce((sum, l) => 
+      sum + l.items.reduce((s, i) => s + i.quantity, 0), 0
+    );
+    const inTransit = itemsByLocation['IN_TRANSIT']?.items.length || 0;
+
+    return { totalLocations, activeLocations, totalItems, inTransit };
+  }, [itemsByLocation, locations]);
+
+  if (isLoading) {
+    return <DashboardSkeleton />;
+  }
+
+  return (
+    <div className="space-y-6 animate-in fade-in duration-500">
+      <header className="flex flex-col md:flex-row md:justify-between md:items-end gap-2 no-print">
+        <div>
+          <h1 className="text-2xl font-bold text-white tracking-tight">
+            Location Overview
+          </h1>
+          <p className="text-sm text-slate-500">
+            Track where your items are located.
+          </p>
+        </div>
+      </header>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="bg-zinc-900/40 backdrop-blur-sm p-6 rounded-xl border border-white/5">
+          <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-1">
+            Total Locations
+          </p>
+          <h3 className="text-4xl font-bold text-white font-mono">{stats.totalLocations}</h3>
+        </div>
+        <div className="bg-zinc-900/40 backdrop-blur-sm p-6 rounded-xl border border-white/5">
+          <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-1">
+            Active Locations
+          </p>
+          <h3 className="text-4xl font-bold text-emerald-400 font-mono">{stats.activeLocations}</h3>
+        </div>
+        <div className="bg-zinc-900/40 backdrop-blur-sm p-6 rounded-xl border border-white/5">
+          <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-1">
+            Items Tracked
+          </p>
+          <h3 className="text-4xl font-bold text-white font-mono">{stats.totalItems}</h3>
+        </div>
+        <div className="bg-zinc-900/40 backdrop-blur-sm p-6 rounded-xl border border-white/5">
+          <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-1">
+            In Transit
+          </p>
+          <h3 className="text-4xl font-bold text-orange-400 font-mono">{stats.inTransit}</h3>
+        </div>
+      </div>
+
+      {/* Filters */}
+      <div className="flex flex-wrap gap-3">
+        <div className="relative group flex-1 md:flex-none">
+          <Search
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 transition-colors"
+            size={16}
+          />
+          <input
+            type="text"
+            placeholder="Search locations or items..."
+            className="w-full md:w-64 pl-9 pr-4 py-2 bg-slate-900 border border-slate-700 rounded text-sm text-slate-200 placeholder-slate-600 focus:ring-1 focus:ring-zinc-600 outline-none transition-all"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+        <select
+          className="px-4 py-2 bg-slate-900 border border-slate-700 rounded text-sm text-slate-200 focus:ring-1 focus:ring-zinc-600 outline-none"
+          value={selectedLocation}
+          onChange={(e) => setSelectedLocation(e.target.value)}
+        >
+          <option value="ALL">All Locations</option>
+          {locations.map(loc => (
+            <option key={loc.id} value={loc.id}>{loc.name}</option>
+          ))}
+          <option value="IN_TRANSIT">In Transit</option>
+        </select>
+      </div>
+
+      {/* Locations Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {filteredLocations.map(({ location, items }) => (
+          <div
+            key={location.id}
+            className="bg-[#0b1120] border border-slate-800 rounded-xl p-6 hover:border-slate-700 transition-all shadow-sm"
+          >
+            {/* Location Header */}
+            <div className="flex items-center justify-between mb-4 pb-4 border-b border-slate-800">
+              <div className="flex items-center gap-3">
+                <div className={`p-2 rounded ${
+                  location.id === 'IN_TRANSIT'
+                    ? 'bg-orange-500/10 text-orange-400'
+                    : location.type === 'WAREHOUSE'
+                      ? 'bg-zinc-800/50 text-zinc-400'
+                      : location.type === 'CLIENT'
+                        ? 'bg-emerald-500/10 text-emerald-400'
+                        : 'bg-slate-800/50 text-slate-400'
+                }`}>
+                  {location.id === 'IN_TRANSIT' ? (
+                    <TrendingUp size={20} />
+                  ) : location.type === 'WAREHOUSE' ? (
+                    <Building2 size={20} />
+                  ) : location.type === 'CLIENT' ? (
+                    <UserCircle size={20} />
+                  ) : (
+                    <MapPin size={20} />
+                  )}
+                </div>
+                <div>
+                  <h3 className="font-bold text-white">{location.name}</h3>
+                  <p className="text-[10px] text-slate-500 uppercase tracking-wider">
+                    {items.length} item{items.length !== 1 ? 's' : ''}
+                  </p>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="text-2xl font-bold text-white font-mono">
+                  {items.reduce((sum, i) => sum + i.quantity, 0)}
+                </p>
+                <p className="text-[10px] text-slate-500 uppercase">Total Units</p>
+              </div>
+            </div>
+
+            {/* Items List */}
+            <div className="space-y-2">
+              {items.map(({ item, quantity, lastMovement }) => (
+                <div
+                  key={item.id}
+                  className="flex items-center justify-between p-3 bg-slate-900/30 rounded-lg border border-slate-800/50 hover:bg-slate-900/50 transition-colors"
+                >
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <img
+                      src={item.imageUrl}
+                      alt={item.name}
+                      className="w-10 h-10 rounded object-cover border border-slate-700"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold text-white truncate">
+                        {item.name}
+                      </p>
+                      <p className="text-xs text-slate-500">
+                        {item.category} • {item.model}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-right ml-3">
+                    <p className="text-lg font-bold text-white font-mono">{quantity}</p>
+                    {lastMovement && (
+                      <p className="text-[9px] text-slate-600">
+                        {new Date(lastMovement).toLocaleDateString()}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {filteredLocations.length === 0 && (
+        <div className="text-center py-12">
+          <p className="text-slate-500">No items found in this location.</p>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // --- APP SHELL & LOGIC ---
 
 enum Screen {
@@ -1640,6 +1902,7 @@ enum Screen {
   INVENTORY = "INVENTORY",
   MOVEMENTS = "MOVEMENTS",
   LOCATIONS = "LOCATIONS",
+  OVERVIEW = "OVERVIEW",
 }
 
 const AppContent: React.FC = () => {
@@ -1657,6 +1920,8 @@ const AppContent: React.FC = () => {
         return <Movements />;
       case Screen.LOCATIONS:
         return <LocationsManagement />;
+      case Screen.OVERVIEW:
+        return <LocationOverview />;
       default:
         return <Dashboard />;
     }
@@ -1711,6 +1976,12 @@ const AppContent: React.FC = () => {
             <p className="px-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">
               Management
             </p>
+            <SidebarItem
+              icon={Activity}
+              label="Location Overview"
+              active={currentScreen === Screen.OVERVIEW}
+              onClick={() => handleNav(Screen.OVERVIEW)}
+            />
             <SidebarItem
               icon={MapPin}
               label="Locations & Clients"
